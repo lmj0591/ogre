@@ -1,0 +1,6 @@
+<map id="Ogre::BillboardParticleRendererFactory" name="Ogre::BillboardParticleRendererFactory">
+<area shape="rect" id="node1" title="Factory class for BillboardParticleRenderer." alt="" coords="68,184,295,225"/>
+<area shape="rect" id="node2" href="$class_ogre_1_1_particle_system_renderer_factory.html" title="Abstract class definition of a factory object for ParticleSystemRenderer." alt="" coords="72,95,291,136"/>
+<area shape="rect" id="node3" href="$class_ogre_1_1_factory_obj.html" title=" " alt="" coords="5,5,200,47"/>
+<area shape="rect" id="node4" title=" " alt="" coords="225,13,295,39"/>
+</map>
