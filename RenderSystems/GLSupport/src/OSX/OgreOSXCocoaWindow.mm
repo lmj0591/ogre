@@ -327,7 +327,6 @@ namespace Ogre {
         mName = [windowTitle cStringUsingEncoding:NSUTF8StringEncoding];
         mWidth = _getPixelFromPoint(widthPt);
         mHeight = _getPixelFromPoint(heightPt);
-        mColourDepth = colourDepth;
         mFSAA = fsaa_samples;
 
         if(!externalWindowHandle)
@@ -560,7 +559,10 @@ namespace Ogre {
         }
         //make sure the context is current
         NSOpenGLContextGuard ctx_guard(mGLContext);
-
+        for (ViewportList::iterator it = mViewportList.begin(); it != mViewportList.end(); ++it)
+        {
+            (*it).second->_updateDimensions();
+        }
 		[mGLContext update];
     }
 

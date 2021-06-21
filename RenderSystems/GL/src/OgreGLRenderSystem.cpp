@@ -44,7 +44,7 @@ THE SOFTWARE.
 #include "OgreException.h"
 #include "OgreGLSLExtSupport.h"
 #include "OgreGLHardwareOcclusionQuery.h"
-#include "OgreGLDepthBuffer.h"
+#include "OgreGLDepthBufferCommon.h"
 #include "OgreGLHardwarePixelBuffer.h"
 #include "OgreGLContext.h"
 #include "OgreGLSLProgramFactory.h"
@@ -152,8 +152,7 @@ namespace Ogre {
     }
 
     GLRenderSystem::GLRenderSystem()
-    :   mStopRendering(false),
-        mFixedFunctionTextureUnits(0),
+    :   mFixedFunctionTextureUnits(0),
         mStencilWriteMask(0xFFFFFFFF),
         mDepthWrite(true),
         mUseAutoTextureMatrix(false),
@@ -370,21 +369,9 @@ namespace Ogre {
         rsc->setCategoryRelevant(CAPS_CATEGORY_GL, true);
         rsc->setDriverVersion(mDriverVersion);
         const char* deviceName = (const char*)glGetString(GL_RENDERER);
-        const char* vendorName = (const char*)glGetString(GL_VENDOR);
         rsc->setDeviceName(deviceName);
         rsc->setRenderSystemName(getName());
-
-        // determine vendor
-        if (strstr(vendorName, "NVIDIA"))
-            rsc->setVendor(GPU_NVIDIA);
-        else if (strstr(vendorName, "ATI"))
-            rsc->setVendor(GPU_AMD);
-        else if (strstr(vendorName, "AMD"))
-            rsc->setVendor(GPU_AMD);
-        else if (strstr(vendorName, "Intel"))
-            rsc->setVendor(GPU_INTEL);
-        else
-            rsc->setVendor(GPU_UNKNOWN);
+        rsc->setVendor(mVendor);
 
         if (mEnableFixedPipeline)
         {
@@ -417,8 +404,6 @@ namespace Ogre {
             rsc->setMaxSupportedAnisotropy(maxAnisotropy);
             rsc->setCapability(RSC_ANISOTROPY);
         }
-
-        rsc->setCapability(RSC_DOT3);
 
         // Point sprites
         if (GLEW_VERSION_2_0 || GLEW_ARB_point_sprite)
@@ -492,14 +477,12 @@ namespace Ogre {
         if (GLEW_NV_register_combiners2 &&
             GLEW_NV_texture_shader)
         {
-            rsc->setCapability(RSC_FRAGMENT_PROGRAM);
             rsc->addShaderProfile("fp20");
         }
 
         // NFZ - check for ATI fragment shader support
         if (GLEW_ATI_fragment_shader)
         {
-            rsc->setCapability(RSC_FRAGMENT_PROGRAM);
             // no boolean params allowed
             rsc->setFragmentProgramConstantBoolCount(0);
             // no integer params allowed
@@ -516,8 +499,6 @@ namespace Ogre {
 
         if (GLEW_ARB_fragment_program)
         {
-            rsc->setCapability(RSC_FRAGMENT_PROGRAM);
-
             // Fragment Program Properties
             rsc->setFragmentProgramConstantBoolCount(0);
             rsc->setFragmentProgramConstantIntCount(0);
@@ -630,8 +611,6 @@ namespace Ogre {
             rsc->setCapability(RSC_TEXTURE_COMPRESSION_VTC);
         }
 
-        // Scissor test is standard in GL 1.2 (is it emulated on some cards though?)
-        rsc->setCapability(RSC_SCISSOR_TEST);
         // As are user clipping planes
         rsc->setCapability(RSC_USER_CLIP_PLANES);
 
@@ -642,12 +621,6 @@ namespace Ogre {
         }
         rsc->setCapability(RSC_STENCIL_WRAP);
         rsc->setCapability(RSC_HWOCCLUSION);
-
-        // UBYTE4 always supported
-        rsc->setCapability(RSC_VERTEX_FORMAT_UBYTE4);
-
-        // Infinite far plane always supported
-        rsc->setCapability(RSC_INFINITE_FAR_PLANE);
 
         // Check for non-power-of-2 texture support
         if(GLEW_ARB_texture_non_power_of_two)
@@ -721,12 +694,6 @@ namespace Ogre {
             // Alpha to coverage always 'supported' when MSAA is available
             // although card may ignore it if it doesn't specifically support A2C
             rsc->setCapability(RSC_ALPHA_TO_COVERAGE);
-        }
-
-        // Advanced blending operations
-        if(GLEW_VERSION_2_0)
-        {
-            rsc->setCapability(RSC_ADVANCED_BLEND_OPERATIONS);
         }
 
         GLfloat lineWidth[2] = {1, 1};
@@ -1008,7 +975,6 @@ namespace Ogre {
         mRTTManager = 0;
 
         mGLSupport->stop();
-        mStopRendering = true;
 
         delete mTextureManager;
         mTextureManager = 0;
@@ -1085,10 +1051,8 @@ namespace Ogre {
             //Only Copy does, but Copy means only one depth buffer...
             GLContext *windowContext = dynamic_cast<GLRenderTarget*>(win)->getContext();;
 
-            GLDepthBuffer *depthBuffer = new GLDepthBuffer( DepthBuffer::POOL_DEFAULT, this,
-                                                            windowContext, 0, 0,
-                                                            win->getWidth(), win->getHeight(),
-                                                            win->getFSAA(), true );
+            auto depthBuffer =
+                new GLDepthBufferCommon(DepthBuffer::POOL_DEFAULT, this, windowContext, 0, 0, win, true);
 
             mDepthBufferPool[depthBuffer->getPoolId()].push_back( depthBuffer );
 
@@ -1100,15 +1064,11 @@ namespace Ogre {
     //---------------------------------------------------------------------
     DepthBuffer* GLRenderSystem::_createDepthBufferFor( RenderTarget *renderTarget )
     {
-        GLDepthBuffer *retVal = 0;
-
         if( auto fbo = dynamic_cast<GLRenderTarget*>(renderTarget)->getFBO() )
         {
-            //Presence of an FBO means the manager is an FBO Manager, that's why it's safe to downcast
             //Find best depth & stencil format suited for the RT's format
             GLuint depthFormat, stencilFormat;
-            static_cast<GLFBOManager*>(mRTTManager)->getBestDepthStencil( fbo->getFormat(),
-                                                                          &depthFormat, &stencilFormat );
+            mRTTManager->getBestDepthStencil(fbo->getFormat(), &depthFormat, &stencilFormat);
 
             GLRenderBuffer *depthBuffer = new GLRenderBuffer( depthFormat, fbo->getWidth(),
                                                               fbo->getHeight(), fbo->getFSAA() );
@@ -1125,19 +1085,11 @@ namespace Ogre {
                                                     fbo->getHeight(), fbo->getFSAA() );
             }
 
-            //No "custom-quality" multisample for now in GL
-            retVal = new GLDepthBuffer( 0, this, mCurrentContext, depthBuffer, stencilBuffer,
-                                        fbo->getWidth(), fbo->getHeight(), fbo->getFSAA(), false );
-        }
-        else
-        {
-            // Only FBO support different depth buffers, so everything
-            // else creates dummy (empty) containers
-            retVal = new GLDepthBuffer(0, this, mCurrentContext, NULL, NULL, renderTarget->getWidth(),
-                                       renderTarget->getHeight(), renderTarget->getFSAA(), false);
+            return new GLDepthBufferCommon(0, this, mCurrentContext, depthBuffer, stencilBuffer,
+                                           renderTarget, false);
         }
 
-        return retVal;
+        return NULL;
     }
 
     void GLRenderSystem::initialiseContext(RenderWindow* primary)
@@ -1209,7 +1161,7 @@ namespace Ogre {
             {
                 //A DepthBuffer with no depth & stencil pointers is a dummy one,
                 //look for the one that matches the same GL context
-                GLDepthBuffer *depthBuffer = static_cast<GLDepthBuffer*>(*itor);
+                auto depthBuffer = static_cast<GLDepthBufferCommon*>(*itor);
                 GLContext *glContext = depthBuffer->getGLContext();
 
                 if( glContext == windowContext &&
@@ -1986,24 +1938,22 @@ namespace Ogre {
         mStateCacheManager->setPolygonMode(glmode);
     }
     //---------------------------------------------------------------------
-    void GLRenderSystem::setStencilCheckEnabled(bool enabled)
+    void GLRenderSystem::setStencilState(const StencilState& state)
     {
-        mStateCacheManager->setEnabled(GL_STENCIL_TEST, enabled);
-    }
-    //---------------------------------------------------------------------
-    void GLRenderSystem::setStencilBufferParams(CompareFunction func,
-                                                uint32 refValue, uint32 compareMask, uint32 writeMask, StencilOperation stencilFailOp,
-                                                StencilOperation depthFailOp, StencilOperation passOp,
-                                                bool twoSidedOperation, bool readBackAsTexture)
-    {
-        bool flip;
-        mStencilWriteMask = writeMask;
+        mStateCacheManager->setEnabled(GL_STENCIL_TEST, state.enabled);
 
-        if (twoSidedOperation)
+        if(!state.enabled)
+            return;
+
+        bool flip;
+        mStencilWriteMask = state.writeMask;
+
+        auto compareOp = convertCompareFunction(state.compareOp);
+
+        if (state.twoSidedOperation)
         {
             if (!mCurrentCapabilities->hasCapability(RSC_TWO_SIDED_STENCIL))
-                OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "2-sided stencils are not supported",
-                            "GLRenderSystem::setStencilBufferParams");
+                OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "2-sided stencils are not supported");
 
             // NB: We should always treat CCW as front face for consistent with default
             // culling mode. Therefore, we must take care with two-sided stencil settings.
@@ -2012,39 +1962,39 @@ namespace Ogre {
             if(GLEW_VERSION_2_0) // New GL2 commands
             {
                 // Back
-                glStencilMaskSeparate(GL_BACK, writeMask);
-                glStencilFuncSeparate(GL_BACK, convertCompareFunction(func), refValue, compareMask);
+                glStencilMaskSeparate(GL_BACK, state.writeMask);
+                glStencilFuncSeparate(GL_BACK, compareOp, state.referenceValue, state.compareMask);
                 glStencilOpSeparate(GL_BACK, 
-                    convertStencilOp(stencilFailOp, !flip), 
-                    convertStencilOp(depthFailOp, !flip), 
-                    convertStencilOp(passOp, !flip));
+                    convertStencilOp(state.stencilFailOp, !flip),
+                    convertStencilOp(state.depthFailOp, !flip),
+                    convertStencilOp(state.depthStencilPassOp, !flip));
                 // Front
-                glStencilMaskSeparate(GL_FRONT, writeMask);
-                glStencilFuncSeparate(GL_FRONT, convertCompareFunction(func), refValue, compareMask);
+                glStencilMaskSeparate(GL_FRONT, state.writeMask);
+                glStencilFuncSeparate(GL_FRONT, compareOp, state.referenceValue, state.compareMask);
                 glStencilOpSeparate(GL_FRONT, 
-                    convertStencilOp(stencilFailOp, flip),
-                    convertStencilOp(depthFailOp, flip), 
-                    convertStencilOp(passOp, flip));
+                    convertStencilOp(state.stencilFailOp, flip),
+                    convertStencilOp(state.depthFailOp, flip),
+                    convertStencilOp(state.depthStencilPassOp, flip));
             }
             else // EXT_stencil_two_side
             {
                 mStateCacheManager->setEnabled(GL_STENCIL_TEST_TWO_SIDE_EXT, true);
                 // Back
                 glActiveStencilFaceEXT(GL_BACK);
-                mStateCacheManager->setStencilMask(writeMask);
-                glStencilFunc(convertCompareFunction(func), refValue, compareMask);
+                mStateCacheManager->setStencilMask(state.writeMask);
+                glStencilFunc(compareOp, state.referenceValue, state.compareMask);
                 glStencilOp(
-                    convertStencilOp(stencilFailOp, !flip),
-                    convertStencilOp(depthFailOp, !flip),
-                    convertStencilOp(passOp, !flip));
+                    convertStencilOp(state.stencilFailOp, !flip),
+                    convertStencilOp(state.depthFailOp, !flip),
+                    convertStencilOp(state.depthStencilPassOp, !flip));
                 // Front
                 glActiveStencilFaceEXT(GL_FRONT);
-                mStateCacheManager->setStencilMask(writeMask);
-                glStencilFunc(convertCompareFunction(func), refValue, compareMask);
+                mStateCacheManager->setStencilMask(state.writeMask);
+                glStencilFunc(compareOp, state.referenceValue, state.compareMask);
                 glStencilOp(
-                    convertStencilOp(stencilFailOp, flip),
-                    convertStencilOp(depthFailOp, flip),
-                    convertStencilOp(passOp, flip));
+                    convertStencilOp(state.stencilFailOp, flip),
+                    convertStencilOp(state.depthFailOp, flip),
+                    convertStencilOp(state.depthStencilPassOp, flip));
             }
         }
         else
@@ -2053,12 +2003,12 @@ namespace Ogre {
                 mStateCacheManager->setEnabled(GL_STENCIL_TEST_TWO_SIDE_EXT, false);
 
             flip = false;
-            mStateCacheManager->setStencilMask(writeMask);
-            glStencilFunc(convertCompareFunction(func), refValue, compareMask);
+            mStateCacheManager->setStencilMask(state.writeMask);
+            glStencilFunc(compareOp, state.referenceValue, state.compareMask);
             glStencilOp(
-                convertStencilOp(stencilFailOp, flip),
-                convertStencilOp(depthFailOp, flip),
-                convertStencilOp(passOp, flip));
+                convertStencilOp(state.stencilFailOp, flip),
+                convertStencilOp(state.depthFailOp, flip),
+                convertStencilOp(state.depthStencilPassOp, flip));
         }
     }
     //---------------------------------------------------------------------
@@ -2480,13 +2430,6 @@ namespace Ogre {
 
             do
             {
-                // Update derived depth bias
-                if (mDerivedDepthBias && mCurrentPassIterationNum > 0)
-                {
-                    _setDepthBias(mDerivedDepthBiasBase +
-                                  mDerivedDepthBiasMultiplier * mCurrentPassIterationNum,
-                                  mDerivedDepthBiasSlopeScale);
-                }
                 if(hasInstanceData)
                 {
                     glDrawElementsInstancedARB(primType, op.indexData->indexCount, indexType, pBufferData, numberOfInstances);
@@ -2502,14 +2445,6 @@ namespace Ogre {
         {
             do
             {
-                // Update derived depth bias
-                if (mDerivedDepthBias && mCurrentPassIterationNum > 0)
-                {
-                    _setDepthBias(mDerivedDepthBiasBase +
-                                  mDerivedDepthBiasMultiplier * mCurrentPassIterationNum,
-                                  mDerivedDepthBiasSlopeScale);
-                }
-
                 if(hasInstanceData)
                 {
                     glDrawArraysInstancedARB(primType, 0, op.vertexData->vertexCount, numberOfInstances);
@@ -2759,7 +2694,7 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void GLRenderSystem::clearFrameBuffer(unsigned int buffers,
-                                          const ColourValue& colour, Real depth, unsigned short stencil)
+                                          const ColourValue& colour, float depth, unsigned short stencil)
     {
         bool colourMask =
             !(mCurrentBlend.writeR && mCurrentBlend.writeG && mCurrentBlend.writeB && mCurrentBlend.writeA);
@@ -2946,7 +2881,7 @@ namespace Ogre {
             }
 
             //Check the FBO's depth buffer status
-            GLDepthBuffer *depthBuffer = static_cast<GLDepthBuffer*>(target->getDepthBuffer());
+            auto depthBuffer = static_cast<GLDepthBufferCommon*>(target->getDepthBuffer());
 
             if( target->getDepthBufferPool() != DepthBuffer::POOL_NO_DEPTH &&
                 (!depthBuffer || depthBuffer->getGLContext() != mCurrentContext ) )
@@ -3054,15 +2989,6 @@ namespace Ogre {
             GLboolean normalised = GL_FALSE;
             switch(elem.getType())
             {
-            case VET_COLOUR:
-            case VET_COLOUR_ABGR:
-            case VET_COLOUR_ARGB:
-                // Because GL takes these as a sequence of single unsigned bytes, count needs to be 4
-                // VertexElement::getTypeCount treats them as 1 (RGBA)
-                // Also need to normalise the fixed-point data
-                typeCount = 4;
-                normalised = GL_TRUE;
-                break;
             case VET_UBYTE4_NORM:
             case VET_SHORT2_NORM:
             case VET_USHORT2_NORM:
@@ -3248,7 +3174,7 @@ namespace Ogre {
         const GLubyte* pcVendor = glGetString(GL_VENDOR);
         tmpStr = (const char*)pcVendor;
         LogManager::getSingleton().logMessage("GL_VENDOR = " + tmpStr);
-        mVendor = tmpStr.substr(0, tmpStr.find(' '));
+        mVendor = RenderSystemCapabilities::vendorFromString(tmpStr.substr(0, tmpStr.find(' ')));
 
         // Get renderer
         const GLubyte* pcRenderer = glGetString(GL_RENDERER);

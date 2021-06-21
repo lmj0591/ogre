@@ -435,14 +435,20 @@ namespace Ogre
         @param name The name of the new material to use
         @param group The resource group of the new material to use
         */
-        virtual void setMaterialName(size_t subIndex, const String& name,
-            const String & group = ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+        void setMaterialName(size_t subIndex, const String& name,
+            const String & group = ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME)
+        {
+            mSectionList.at(subIndex)->setMaterialName(name, group);
+        }
 
         /** @overload
         @param subIndex The index of the subsection to alter
         @param mat The new material to use
         */
-        virtual void setMaterial(size_t subIndex, const MaterialPtr &mat);
+        void setMaterial(size_t subIndex, const MaterialPtr& mat)
+        {
+            mSectionList.at(subIndex)->setMaterial(mat);
+        }
 
         /** Convert this object to a Mesh. 
         @remarks
@@ -515,11 +521,9 @@ namespace Ogre
         */
         const std::vector<ManualObjectSection*>& getSections() const { return mSectionList; }
 
-        /// @deprecated use getSections()
-        OGRE_DEPRECATED ManualObjectSection* getSection(unsigned int index) const;
+        ManualObjectSection* getSection(size_t index) const { return mSectionList.at(index); }
 
-        /// @deprecated use getSections()
-        OGRE_DEPRECATED unsigned int getNumSections(void) const;
+        size_t getNumSections(void) const { return mSectionList.size(); }
 
 
         /** Sets whether or not to keep the original declaration order when 
@@ -643,7 +647,7 @@ namespace Ogre
             bool debugRenderables = false);
         
         
-    protected:
+    private:
         /// Dynamic?
         HardwareBuffer::Usage mBufferUsage;
         /// List of subsections

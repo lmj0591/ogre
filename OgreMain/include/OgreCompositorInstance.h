@@ -34,6 +34,8 @@ THE SOFTWARE.
 #include "OgreCompositionTechnique.h"
 #include "OgreHeaderPrefix.h"
 
+#include <bitset>
+
 namespace Ogre {
 
     /** \addtogroup Core
@@ -117,12 +119,12 @@ namespace Ogre {
             TargetOperation()
             { 
             }
-            TargetOperation(RenderTarget *inTarget):
-                target(inTarget), currentQueueGroupID(0), visibilityMask(0xFFFFFFFF),
-                lodBias(1.0f),
-                onlyInitial(false), hasBeenRendered(false), findVisibleObjects(false), 
-                materialScheme(MaterialManager::DEFAULT_SCHEME_NAME), shadowsEnabled(true)
-            { 
+            TargetOperation(RenderTarget* inTarget)
+                : target(inTarget), currentQueueGroupID(0), visibilityMask(0xFFFFFFFF), lodBias(1.0f),
+                  onlyInitial(false), hasBeenRendered(false), findVisibleObjects(false),
+                  materialScheme(MaterialManager::DEFAULT_SCHEME_NAME), shadowsEnabled(true),
+                  alignCameraToFace(-1)
+            {
             }
             /// Target
             RenderTarget *target;
@@ -163,6 +165,9 @@ namespace Ogre {
             String materialScheme;
             /** Whether shadows will be enabled */
             bool shadowsEnabled;
+
+            String cameraOverride;
+            int alignCameraToFace;
         };
         typedef std::vector<TargetOperation> CompiledState;
         
@@ -224,7 +229,7 @@ namespace Ogre {
             targets manually or any other modifications, the compositor instance 
             is in charge of this.
         */
-        RenderTarget* getRenderTarget(const String& name);
+        RenderTarget* getRenderTarget(const String& name, int slice = 0);
 
        
         /** Recursively collect target states (except for final Pass).
@@ -240,11 +245,11 @@ namespace Ogre {
         
         /** Get Compositor of which this is an instance
         */
-        Compositor *getCompositor();
+        Compositor *getCompositor() const { return mCompositor; }
         
         /** Get CompositionTechnique used by this instance
         */
-        CompositionTechnique *getTechnique();
+        CompositionTechnique *getTechnique() const { return mTechnique; }
 
         /** Change the technique we're using to render this compositor. 
         @param tech
@@ -356,6 +361,8 @@ namespace Ogre {
         /** Create local rendertextures and other resources. Builds mLocalTextures.
         */
         void createResources(bool forResizeOnly);
+
+        void setupRenderTarget(RenderTarget* target, uint16 depthBufferId);
         
         /** Destroy local rendertextures and other resources.
         */
@@ -366,7 +373,7 @@ namespace Ogre {
 
         /** Get RenderTarget for a named local texture.
         */
-        RenderTarget *getTargetForTex(const String &name);
+        RenderTarget *getTargetForTex(const String &name, int slice);
         
         /** Get source texture name for a named local texture.
         @param name

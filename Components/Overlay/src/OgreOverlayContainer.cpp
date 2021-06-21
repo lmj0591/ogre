@@ -30,6 +30,7 @@ THE SOFTWARE.
 #include "OgreException.h"
 #include "OgreOverlayManager.h"
 #include "OgreOverlay.h"
+#include "OgreIteratorWrapper.h"
 
 namespace Ogre {
 
@@ -343,7 +344,7 @@ namespace Ogre {
                             oldChildElement->getTypeName(), 
                             mName+"/"+oldChildElement->getName());
                      newChildElement->copyFromTemplate(oldChildElement);
-                     addChild(static_cast<OverlayContainer*>(newChildElement));
+                     addChild(newChildElement);
                  }
              }
         }

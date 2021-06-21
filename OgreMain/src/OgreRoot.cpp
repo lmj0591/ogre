@@ -44,20 +44,18 @@ THE SOFTWARE.
 #include "OgreBillboardChain.h"
 #include "OgreRibbonTrail.h"
 #include "OgreLight.h"
-#include "OgreRenderQueueInvocation.h"
 #include "OgreConvexBody.h"
 #include "OgreTimer.h"
 #include "OgreFrameListener.h"
 #include "OgreLodStrategyManager.h"
 #include "OgreFileSystemLayer.h"
-#include "OgreSceneLoaderManager.h"
 
 #if OGRE_NO_DDS_CODEC == 0
 #include "OgreDDSCodec.h"
 #endif
 
 #include "OgreHardwareBufferManager.h"
-#include "OgreHighLevelGpuProgramManager.h"
+#include "OgreGpuProgramManager.h"
 #include "OgreExternalTextureSourceManager.h"
 #include "OgreCompositorManager.h"
 
@@ -98,6 +96,7 @@ namespace Ogre {
     Root::Root(const String& pluginFileName, const String& configFileName,
         const String& logFileName)
       : mQueuedEnd(false)
+      , mCurrentSceneManager(NULL)
       , mNextFrame(0)
       , mFrameSmoothingTime(0.0f)
       , mRemoveQueueStructuresOnClear(false)
@@ -199,11 +198,10 @@ namespace Ogre {
         ASTCCodec::startup();
 #endif
 
-        mHighLevelGpuProgramManager.reset(new HighLevelGpuProgramManager());
+        mGpuProgramManager.reset(new GpuProgramManager());
         mExternalTextureSourceManager.reset(new ExternalTextureSourceManager());
         mCompositorManager.reset(new CompositorManager());
         mCompilerManager.reset(new ScriptCompilerManager());
-        mSceneLoaderManager.reset(new SceneLoaderManager());
 
         // Auto window
         mAutoWindow = 0;
@@ -240,8 +238,6 @@ namespace Ogre {
     {
         shutdown();
 
-        destroyAllRenderQueueInvocationSequences();
-
 #if OGRE_NO_DDS_CODEC == 0
         DDSCodec::shutdown();
 #endif
@@ -256,6 +252,7 @@ namespace Ogre {
 #endif
 		mCompositorManager.reset(); // needs rendersystem
         mParticleManager.reset(); // may use plugins
+        mGpuProgramManager.reset(); // may use plugins
         unloadPlugins();
 
         mAutoWindow = 0;
@@ -385,6 +382,7 @@ namespace Ogre {
             return false;
         }
 
+        bool optionError = false;
         ConfigFile::SettingsBySection_::const_iterator seci;
         for(seci = cfg.getSettingsBySection().begin(); seci != cfg.getSettingsBySection().end(); ++seci) {
             const ConfigFile::SettingsMultiMap& settings = seci->second;
@@ -397,10 +395,18 @@ namespace Ogre {
                 continue;
             }
 
-            ConfigFile::SettingsMultiMap::const_iterator i;
-            for (i = settings.begin(); i != settings.end(); ++i)
+            for (auto p : settings)
             {
-                rs->setConfigOption(i->first, i->second);
+                try
+                {
+                    rs->setConfigOption(p.first, p.second);
+                }
+                catch(const InvalidParametersException& e)
+                {
+                    LogManager::getSingleton().logError(e.getDescription());
+                    optionError = true;
+                    continue;
+                }
             }
         }
 
@@ -418,14 +424,14 @@ namespace Ogre {
         setRenderSystem(rs);
 
         // Successful load
-        return true;
-
+        return !optionError;
     }
 
     //-----------------------------------------------------------------------
     bool Root::showConfigDialog(ConfigDialog* dialog) {
         if(dialog) {
-            restoreConfig();
+            if(!mActiveRenderer)
+                restoreConfig();
 
             if (dialog->display()) {
                 saveConfig();
@@ -503,18 +509,6 @@ namespace Ogre {
         mRenderers.push_back(newRend);
     }
     //-----------------------------------------------------------------------
-    void Root::_pushCurrentSceneManager(SceneManager* sm)
-    {
-        mSceneManagerStack.push_back(sm);
-    }
-    //-----------------------------------------------------------------------
-    void Root::_popCurrentSceneManager(SceneManager* sm)
-    {
-        assert (_getCurrentSceneManager() == sm && "Mismatched push/pop of SceneManager");
-
-        mSceneManagerStack.pop_back();
-    }
-    //-----------------------------------------------------------------------
     RenderSystem* Root::getRenderSystem(void)
     {
         // Gets the currently active renderer
@@ -525,10 +519,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     RenderWindow* Root::initialise(bool autoCreateWindow, const String& windowTitle, const String& customCapabilitiesConfig)
     {
-        if (!mActiveRenderer)
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot initialise - no render "
-            "system has been selected.", "Root::initialise");
+        OgreAssert(mActiveRenderer, "Cannot initialise");
 
         if (!mControllerManager)
             mControllerManager.reset(new ControllerManager());
@@ -841,7 +832,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Root::startRendering(void)
     {
-        OgreAssert(mActiveRenderer != 0, "no RenderSystem");
+        OgreAssert(mActiveRenderer, "no RenderSystem");
 
         mActiveRenderer->_initRenderTargets();
 
@@ -1061,14 +1052,6 @@ namespace Ogre {
         return _openFileStream(filename, std::ios::in | std::ios::binary);
     }
     //-----------------------------------------------------------------------
-    void Root::convertColourValue(const ColourValue& colour, uint32* pDest)
-    {
-        assert(mActiveRenderer != 0);
-        OGRE_IGNORE_DEPRECATED_BEGIN
-        mActiveRenderer->convertColourValue(colour, pDest);
-        OGRE_IGNORE_DEPRECATED_END
-    }
-    //-----------------------------------------------------------------------
     RenderWindow* Root::getAutoCreatedWindow(void)
     {
         return mAutoWindow;
@@ -1077,18 +1060,10 @@ namespace Ogre {
     RenderWindow* Root::createRenderWindow(const String &name, unsigned int width, unsigned int height,
             bool fullScreen, const NameValuePairList *miscParams)
     {
-        if (!mIsInitialised)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot create window - Root has not been initialised! "
-            "Make sure to call Root::initialise before creating a window.", "Root::createRenderWindow");
-        }
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot create window - no render "
-            "system has been selected.", "Root::createRenderWindow");
-        }
+        OgreAssert(mIsInitialised,
+                   "Cannot create window! Make sure to call Root::initialise before creating a window");
+        OgreAssert(mActiveRenderer, "Cannot create window");
+
         RenderWindow* ret;
         ret = mActiveRenderer->_createRenderWindow(name, width, height, fullScreen, miscParams);
 
@@ -1103,56 +1078,15 @@ namespace Ogre {
 
     }
     //-----------------------------------------------------------------------
-    bool Root::createRenderWindows(const RenderWindowDescriptionList& renderWindowDescriptions,
-        RenderWindowList& createdWindows)
-    {
-        if (!mIsInitialised)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot create window - Root has not been initialised! "
-            "Make sure to call Root::initialise before creating a window.", "Root::createRenderWindows");
-        }
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-                "Cannot create render windows - no render "
-                "system has been selected.", "Root::createRenderWindows");
-        }
-
-        bool success;
-        OGRE_IGNORE_DEPRECATED_BEGIN
-        success = mActiveRenderer->_createRenderWindows(renderWindowDescriptions, createdWindows);
-        OGRE_IGNORE_DEPRECATED_END
-        if(success && !mFirstTimePostWindowInit)
-        {
-            oneTimePostWindowInit();
-            createdWindows[0]->_setPrimary();
-        }
-
-        return success;
-    }
-    //-----------------------------------------------------------------------
     RenderTarget* Root::detachRenderTarget(RenderTarget* target)
     {
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot detach target - no render "
-            "system has been selected.", "Root::detachRenderTarget");
-        }
-
+        OgreAssert(mActiveRenderer, "Cannot detach target");
         return mActiveRenderer->detachRenderTarget( target->getName() );
     }
     //-----------------------------------------------------------------------
     RenderTarget* Root::detachRenderTarget(const String &name)
     {
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot detach target - no render "
-            "system has been selected.", "Root::detachRenderTarget");
-        }
-
+        OgreAssert(mActiveRenderer, "Cannot detach target");
         return mActiveRenderer->detachRenderTarget( name );
     }
     //-----------------------------------------------------------------------
@@ -1170,13 +1104,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     RenderTarget* Root::getRenderTarget(const String &name)
     {
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-            "Cannot get target - no render "
-            "system has been selected.", "Root::getRenderTarget");
-        }
-
+        OgreAssert(mActiveRenderer, "Cannot get target");
         return mActiveRenderer->getRenderTarget(name);
     }
     //---------------------------------------------------------------------
@@ -1421,69 +1349,10 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-    RenderQueueInvocationSequence* Root::createRenderQueueInvocationSequence(
-        const String& name)
-    {
-        RenderQueueInvocationSequenceMap::iterator i =
-            mRQSequenceMap.find(name);
-        if (i != mRQSequenceMap.end())
-        {
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM,
-                "RenderQueueInvocationSequence with the name " + name +
-                    " already exists.",
-                "Root::createRenderQueueInvocationSequence");
-        }
-        RenderQueueInvocationSequence* ret = OGRE_NEW RenderQueueInvocationSequence(name);
-        mRQSequenceMap[name] = ret;
-        return ret;
-    }
-    //---------------------------------------------------------------------
-    RenderQueueInvocationSequence* Root::getRenderQueueInvocationSequence(
-        const String& name)
-    {
-        RenderQueueInvocationSequenceMap::iterator i =
-            mRQSequenceMap.find(name);
-        if (i == mRQSequenceMap.end())
-        {
-            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
-                "RenderQueueInvocationSequence with the name " + name +
-                " not found.",
-                "Root::getRenderQueueInvocationSequence");
-        }
-        return i->second;
-    }
-    //---------------------------------------------------------------------
-    void Root::destroyRenderQueueInvocationSequence(
-        const String& name)
-    {
-        RenderQueueInvocationSequenceMap::iterator i =
-            mRQSequenceMap.find(name);
-        if (i != mRQSequenceMap.end())
-        {
-            OGRE_DELETE i->second;
-            mRQSequenceMap.erase(i);
-        }
-    }
-    //---------------------------------------------------------------------
-    void Root::destroyAllRenderQueueInvocationSequences(void)
-    {
-        for (RenderQueueInvocationSequenceMap::iterator i = mRQSequenceMap.begin();
-            i != mRQSequenceMap.end(); ++i)
-        {
-            OGRE_DELETE i->second;
-        }
-        mRQSequenceMap.clear();
-    }
-
-    //---------------------------------------------------------------------
     unsigned int Root::getDisplayMonitorCount() const
     {
-        if (!mActiveRenderer)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-                "Cannot get display monitor count "
-                "No render system has been selected.", "Root::getDisplayMonitorCount");
-        }
+        OgreAssert(mActiveRenderer,
+                   "Cannot get display monitor count - No render system has been selected");
 
         OGRE_IGNORE_DEPRECATED_BEGIN
         return mActiveRenderer->getDisplayMonitorCount();

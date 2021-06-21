@@ -43,11 +43,11 @@ For manually building the dependencies, please refer to the list below and get a
 
 On linux you additionally need the following system headers to build the GL & GLES2 RenderSystems (command for Ubuntu):
 
-    sudo apt-get install libgles2-mesa-dev libxt-dev libxaw7-dev
+    sudo apt-get install libgles2-mesa-dev
 
 furthermore we recommend installing the following optional packages
 
-    sudo apt-get install libsdl2-dev doxygen
+    sudo apt-get install libsdl2-dev libxt-dev libxaw7-dev doxygen
 
 these will enable input handling in the SampleBrowser and building the documentation.
 
@@ -113,7 +113,7 @@ on MacOS.
 
 If you rather want to trigger the build form a console, then cd to your build directory and call the appropriate make program as
 
-    cmake --build . --config release
+    cmake --build . --config Release
 
 to start the build process.
 
@@ -132,9 +132,9 @@ Installing
 Once the build is complete, you can optionally have the build system
 copy the built libraries and headers to a clean location. We recommend
 you do this step as it will make it easier to use Ogre in your projects.
-In Visual Studio, just select and build the target *INSTALL*. When using the command line with MSVC, type:
+In Visual Studio, just select and build the target *INSTALL*. When using the command line, type:
 
-    cmake --build . --config release --target INSTALL
+    cmake --build . --config Release --target install
 
 For Makefile based generators, type:
 
@@ -222,16 +222,10 @@ Visual Studio 2015 is recommended as it is bundled with Universal 10.0.240.0, Wi
 
 Download and install CMake 3.4 or later.
 
-Compile dependencies for all configurations that you plan to use before
-running CMake. Dependencies for Win32 and for WinRT must be located in
+Dependencies for Win32 and for WinRT must be located in
 separate folders. Cg is not supported.
 
-Run CMake, specify source and binaries folders, than "Configure", select
-"Visual Studio 14 2015" generator and "Specify options for cross-compiling"
-option, specify Operating System = "WindowsStore" or "WindowsPhone",
-Version = "8.0", "8.1" or for UAP Operating System = "WindowsStore", Version = "10.0.10240.0", "10.0.10586.0" then "Finish", specify WinRT dependencies folder
-for OGRE_DEPENDENCIES_DIR, "Configure", should be no more errors, then press
-"Generate".
+    cmake.exe -G "Visual Studio 15 2017" -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 ..
 
 Select SampleBrowser as the start up project and run.
 

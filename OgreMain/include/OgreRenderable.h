@@ -63,11 +63,6 @@ namespace Ogre {
     class _OgreExport Renderable
     {
     public:
-        /// @deprecated do not use
-        class RenderSystemData {};
-        typedef SharedPtr<RenderSystemData> RenderSystemDataPtr;
-        
-    public:
         enum
         {
             DEFAULT_PRIORITY = 100
@@ -198,10 +193,10 @@ namespace Ogre {
         */
         bool getUseIdentityView(void) const { return mUseIdentityView; }
 
-        /** Returns the camera-relative squared depth of this renderable.
-        @remarks
-            Used to sort transparent objects. Squared depth is used rather than
-            actual depth to avoid having to perform a square root on the result.
+        /** Returns the squared distance between the camera and this renderable.
+
+            Used to sort transparent objects. Squared distance is used
+            to avoid having to perform a square root on the result.
         */
         virtual Real getSquaredViewDepth(const Camera* cam) const = 0;
 
@@ -357,26 +352,13 @@ namespace Ogre {
                 Any* pAny = 0) = 0;
         };
 
-        /// @deprecated do not use
-        OGRE_DEPRECATED const RenderSystemDataPtr& getRenderSystemData() const
-        { 
-            return mRenderSystemData; 
-        }
-        /// @deprecated do not use
-        OGRE_DEPRECATED void setRenderSystemData(RenderSystemDataPtr val) const
-        { 
-            mRenderSystemData = val; 
-        }
-
-
     protected:
         typedef std::map<size_t, Vector4> CustomParameterMap;
         CustomParameterMap mCustomParameters;
+        UserObjectBindings mUserObjectBindings;      /// User objects binding.
         bool mPolygonModeOverrideable;
         bool mUseIdentityProjection;
         bool mUseIdentityView;
-        UserObjectBindings mUserObjectBindings;      /// User objects binding.
-        mutable RenderSystemDataPtr mRenderSystemData;/// This should be used only by a render system for internal use
     };
 
     /** @} */

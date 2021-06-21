@@ -43,14 +43,18 @@
 
 #include <iomanip>
 
-/** \addtogroup Optional
-*  @{
-*/
-/** \addtogroup Bites
-*  @{
-*/
 namespace OgreBites
 {
+    /** \addtogroup Optional
+    *  @{
+    */
+    /** \addtogroup Bites
+    *  @{
+    */
+    /** @defgroup Trays Trays
+     * Simplistic GUI System build with Overlays
+     * @{
+     */
     enum TrayLocation   /// enumerator values for widget tray anchoring locations
     {
         TL_TOPLEFT,
@@ -1115,13 +1119,13 @@ namespace OgreBites
             windowUpdate();
         }
 
-        void worldGeometryStageStarted(const Ogre::String& description)
+        void customStageStarted(const Ogre::String& description)
         {
             mLoadBar->setComment(description);
             windowUpdate();
         }
 
-        void worldGeometryStageEnded()
+        void customStageEnded()
         {
             mLoadBar->setProgress(mLoadBar->getProgress() + mLoadInc);
             windowUpdate();
@@ -1200,8 +1204,8 @@ namespace OgreBites
         Ogre::Vector2 mCursorPos;             // current cursor position
 
     };
+    /** @} */
+    /** @} */
+    /** @} */
 }
-
-/** @} */
-/** @} */
 #endif

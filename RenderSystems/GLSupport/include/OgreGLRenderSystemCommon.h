@@ -52,7 +52,7 @@ namespace Ogre {
 
         // This contains the complete list of supported extensions
         std::set<String> mExtensionList;
-        String mVendor;
+        GPUVendor mVendor;
 
         /** Manager object for creating render textures.
             Direct render to texture via FBO is preferable
@@ -117,8 +117,6 @@ namespace Ogre {
         */
         bool checkExtension(const String& ext) const;
 
-        String validateConfigOptions() { return BLANKSTRING; }
-
         /** Unregister a render target->context mapping. If the context of target
             is the current context, change the context to the main context so it
             can be destroyed safely.
@@ -132,8 +130,6 @@ namespace Ogre {
                                             const HardwareVertexBufferSharedPtr& vertexBuffer,
                                             const size_t vertexStart) = 0;
 
-        Real getHorizontalTexelOffset(void) { return 0.0; }               // No offset in GL
-        Real getVerticalTexelOffset(void) { return 0.0; }                 // No offset in GL
         Real getMinimumDepthInputValue(void) { return -1.0f; }            // Range [-1.0f, 1.0f]
         Real getMaximumDepthInputValue(void) { return 1.0f; }             // Range [-1.0f, 1.0f]
 

@@ -66,24 +66,6 @@ namespace Ogre {
         emscripten_set_webglcontextrestored_callback("#canvas", NULL, 0, NULL);
     }
 
-    void EmscriptenEGLWindow::getLeftAndTopFromNativeWindow( int & left, int & top, uint width, uint height )
-    {
-        // We don't have a native window, so return 0.
-        left = top = 0;
-    }
-
-    void EmscriptenEGLWindow::initNativeCreatedWindow(const NameValuePairList *miscParams)
-    {
-    }
-
-    void EmscriptenEGLWindow::createNativeWindow( int &left, int &top, uint &width, uint &height, String &title )
-    {
-    }
-
-    void EmscriptenEGLWindow::reposition( int left, int top )
-    {
-    }
-
     void EmscriptenEGLWindow::resize(uint width, uint height)
     {
         mWidth = width;
@@ -195,14 +177,13 @@ namespace Ogre {
             {
                 mCSAA = Ogre::StringConverter::parseInt(opt->second);
             }
-            
-            if((opt = miscParams->find("parentWindowHandle")) != end)
+
+            if ((opt = miscParams->find("externalWindowHandle")) != end ||
+                (opt = miscParams->find("parentWindowHandle")) != end)
             {
                 mCanvasSelector = opt->second;
             }
         }
-        
-        initNativeCreatedWindow(miscParams);
         
         if (mEglSurface)
         {

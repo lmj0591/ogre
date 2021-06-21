@@ -54,15 +54,6 @@ namespace Ogre {
         typedef float Real;
     #endif
 
-    /// @deprecated
-    #define OGRE_HashMap ::std::unordered_map
-    /// @deprecated
-    #define OGRE_HashMultiMap ::std::unordered_multimap
-    /// @deprecated
-    #define OGRE_HashSet ::std::unordered_set
-    /// @deprecated
-    #define OGRE_HashMultiSet ::std::unordered_multiset
-
     /** In order to avoid finger-aches :)
     */
     typedef unsigned char uchar;
@@ -118,17 +109,17 @@ namespace Ogre {
     class GpuProgramParameters;
     class GpuSharedParameters;
     class GpuProgram;
+    class GpuProgramFactory;
+    typedef GpuProgramFactory HighLevelGpuProgramFactory; //!< @deprecated
     class GpuProgramManager;
+    typedef GpuProgramManager HighLevelGpuProgramManager; //!< @deprecated
     class GpuProgramUsage;
     class HardwareBuffer;
     class HardwareIndexBuffer;
     class HardwareOcclusionQuery;
-    class HardwareUniformBuffer;
     class HardwareVertexBuffer;
     class HardwarePixelBuffer;
     class HighLevelGpuProgram;
-    class HighLevelGpuProgramManager;
-    class HighLevelGpuProgramFactory;
     class IndexData;
     class InstanceBatch;
     class InstanceBatchHW;
@@ -173,7 +164,8 @@ namespace Ogre {
     class ParticleSystem;
     class ParticleSystemManager;
     class ParticleSystemRenderer;
-    class ParticleSystemRendererFactory;
+    template<typename T> class FactoryObj;
+    typedef FactoryObj<ParticleSystemRenderer> ParticleSystemRendererFactory;
     class ParticleVisualData;
     class Pass;
     class PatchMesh;
@@ -193,8 +185,6 @@ namespace Ogre {
     class RenderPriorityGroup;
     class RenderQueue;
     class RenderQueueGroup;
-    class RenderQueueInvocation;
-    class RenderQueueInvocationSequence;
     class RenderQueueListener;
     class RenderObjectListener;
     class RenderSystem;
@@ -216,7 +206,6 @@ namespace Ogre {
     class Root;
     class SceneManager;
     class SceneManagerEnumerator;
-    class SceneLoaderManager;
     class SceneNode;
     class SceneQuery;
     class SceneQueryListener;
@@ -292,10 +281,10 @@ namespace Ogre {
     typedef SharedPtr<HardwareBuffer> HardwareBufferPtr;
     typedef SharedPtr<HardwareIndexBuffer> HardwareIndexBufferSharedPtr;
     typedef SharedPtr<HardwarePixelBuffer> HardwarePixelBufferSharedPtr;
-    typedef SharedPtr<HardwareUniformBuffer> HardwareUniformBufferSharedPtr;
-    typedef HardwareUniformBufferSharedPtr HardwareCounterBufferSharedPtr;
+    typedef HardwareBufferPtr HardwareUniformBufferSharedPtr; //!< @deprecated
+    typedef HardwareBufferPtr HardwareCounterBufferSharedPtr; //!< @deprecated
     typedef SharedPtr<HardwareVertexBuffer> HardwareVertexBufferSharedPtr;
-    typedef SharedPtr<HighLevelGpuProgram> HighLevelGpuProgramPtr;
+    typedef GpuProgramPtr HighLevelGpuProgramPtr; //!< @deprecated
     typedef SharedPtr<Material> MaterialPtr;
     typedef SharedPtr<MemoryDataStream> MemoryDataStreamPtr;
     typedef SharedPtr<Mesh> MeshPtr;
@@ -316,71 +305,12 @@ settings have been made.
 
 namespace Ogre
 {
-    /// @deprecated use std::atomic
-    template<class T> using AtomicScalar = std::atomic<T>;
-
-    typedef std::string _StringBase;
-    typedef std::basic_stringstream<char,std::char_traits<char>,std::allocator<char> > _StringStreamBase;
-
-    typedef _StringBase String;
-    typedef _StringStreamBase StringStream;
-    typedef StringStream stringstream;
-}
-
-//for stl container
-namespace Ogre
-{
-    template <typename T>
-    struct OGRE_DEPRECATED deque
-    { 
-        typedef typename std::deque<T> type;
-        typedef typename std::deque<T>::iterator iterator;
-        typedef typename std::deque<T>::const_iterator const_iterator;
-    };
-
-    template <typename T>
-    struct OGRE_DEPRECATED vector
-    { 
-        typedef typename std::vector<T> type;
-        typedef typename std::vector<T>::iterator iterator;
-        typedef typename std::vector<T>::const_iterator const_iterator;
-    };
+    typedef std::string String;
+    typedef std::stringstream StringStream;
 
     template <typename T, size_t Alignment = OGRE_SIMD_ALIGNMENT>
     using aligned_vector = std::vector<T, AlignedAllocator<T, Alignment>>;
-
-    template <typename T>
-    struct OGRE_DEPRECATED list
-    { 
-        typedef typename std::list<T> type;
-        typedef typename std::list<T>::iterator iterator;
-        typedef typename std::list<T>::const_iterator const_iterator;
-    };
-
-    template <typename T, typename P = std::less<T> >
-    struct OGRE_DEPRECATED set
-    { 
-        typedef typename std::set<T, P> type;
-        typedef typename std::set<T, P>::iterator iterator;
-        typedef typename std::set<T, P>::const_iterator const_iterator;
-    };
-
-    template <typename K, typename V, typename P = std::less<K> >
-    struct OGRE_DEPRECATED map
-    { 
-        typedef typename std::map<K, V, P> type;
-        typedef typename std::map<K, V, P>::iterator iterator;
-        typedef typename std::map<K, V, P>::const_iterator const_iterator;
-    };
-
-    template <typename K, typename V, typename P = std::less<K> >
-    struct OGRE_DEPRECATED multimap
-    { 
-        typedef typename std::multimap<K, V, P> type;
-        typedef typename std::multimap<K, V, P>::iterator iterator;
-        typedef typename std::multimap<K, V, P>::const_iterator const_iterator;
-    };
-} // Ogre
+}
 
 #endif // __OgrePrerequisites_H__
 

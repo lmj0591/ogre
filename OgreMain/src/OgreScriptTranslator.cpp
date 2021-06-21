@@ -47,6 +47,27 @@ THE SOFTWARE.
 #include "OgreGpuProgramUsage.h"
 
 namespace Ogre{
+    static void applyTextureAliases(const Material* mat, const NameValuePairList& aliasList)
+    {
+        for (auto t : mat->getTechniques())
+        {
+            for (auto p : t->getPasses())
+            {
+                for (auto tus : p->getTextureUnitStates())
+                {
+                    auto aliasIt = aliasList.find(tus->getName());
+                    if (aliasIt == aliasList.end())
+                        continue;
+
+                    if (tus->getNumFrames() > 1)
+                        tus->setAnimatedTextureName(aliasIt->second, tus->getNumFrames(),
+                                                    tus->getAnimationDuration());
+                    else
+                        tus->setTextureName(aliasIt->second, tus->getTextureType());
+                }
+            }
+        }
+    }
 
     static GpuProgramType translateIDToGpuProgramType(uint32 id)
     {
@@ -1225,9 +1246,9 @@ namespace Ogre{
             PreApplyTextureAliasesScriptCompilerEvent locEvt(mMaterial, &mTextureAliases);
             compiler->_fireEvent(&locEvt, 0);
         }
-        mMaterial->applyTextureAliases(mTextureAliases);
-        mTextureAliases.clear();
         OGRE_IGNORE_DEPRECATED_END
+        applyTextureAliases(mMaterial, mTextureAliases);
+        mTextureAliases.clear();
     }
 
     /**************************************************************************
@@ -2285,16 +2306,16 @@ namespace Ogre{
                     translateProgramRef(getProgramType(child->id), compiler, child);
                     break;
                 case ID_SHADOW_CASTER_VERTEX_PROGRAM_REF:
-                    translateShadowCasterVertexProgramRef(compiler, child);
+                    translateShadowCasterProgramRef(GPT_VERTEX_PROGRAM, compiler, child);
                     break;
                 case ID_SHADOW_CASTER_FRAGMENT_PROGRAM_REF:
-                    translateShadowCasterFragmentProgramRef(compiler, child);
+                    translateShadowCasterProgramRef(GPT_FRAGMENT_PROGRAM, compiler, child);
                     break;
                 case ID_SHADOW_RECEIVER_VERTEX_PROGRAM_REF:
-                    translateShadowReceiverVertexProgramRef(compiler, child);
+                    translateShadowReceiverProgramRef(GPT_VERTEX_PROGRAM, compiler, child);
                     break;
                 case ID_SHADOW_RECEIVER_FRAGMENT_PROGRAM_REF:
-                    translateShadowReceiverFragmentProgramRef(compiler, child);
+                    translateShadowReceiverProgramRef(GPT_FRAGMENT_PROGRAM, compiler, child);
                     break;
                 default:
                     processNode(compiler, *i);
@@ -2316,114 +2337,98 @@ namespace Ogre{
         }
     }
 
-    static Pass* getPass(ScriptCompiler* compiler, ObjectAbstractNode* node)
+    static GpuProgramPtr getProgram(ScriptCompiler* compiler, ObjectAbstractNode* node)
     {
         if(node->name.empty())
         {
             compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, node->file, node->line);
-            return NULL;
+            return nullptr;
         }
 
         ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::GPU_PROGRAM, node->name);
         compiler->_fireEvent(&evt, 0);
 
-        if (!GpuProgramManager::getSingleton().getByName(evt.mName, compiler->getResourceGroup()))
-        {
-            //recheck with auto resource group
-            if (!GpuProgramManager::getSingleton().getByName(
-                    evt.mName, ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME))
-            {
-                compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file,
-                                   node->line, evt.mName);
-                return NULL;
-            }
-        }
+        auto& mgr = GpuProgramManager::getSingleton();
+        if (auto ret = mgr.getByName(evt.mName, compiler->getResourceGroup()))
+            return ret;
 
-        return any_cast<Pass*>(node->parent->context);
+        // recheck with auto resource group
+        if (auto ret = mgr.getByName(evt.mName, RGN_AUTODETECT))
+            return ret;
+
+        compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file, node->line,
+                           evt.mName);
+        return nullptr;
     }
 
     //-------------------------------------------------------------------------
     void PassTranslator::translateProgramRef(GpuProgramType type, ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        Pass *pass = getPass(compiler, node);
-        if(!pass) return;
-
-        auto program = GpuProgramUsage::_getProgramByName(node->name, pass->getResourceGroup(), type);
-        if (!program) {
-            compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file,
-                               node->line, node->name);
-            return;
-        }
+        auto program = getProgram(compiler, node);
+        if(!program) return;
+        auto pass = any_cast<Pass*>(node->parent->context);
 
         pass->setGpuProgram(type, program);
-        if(pass->getGpuProgram(type)->isSupported())
+        if(program->isSupported())
         {
             GpuProgramParametersSharedPtr params = pass->getGpuProgramParameters(type);
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
     //-------------------------------------------------------------------------
-    OGRE_IGNORE_DEPRECATED_BEGIN
-    void PassTranslator::translateShadowCasterVertexProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
+    void PassTranslator::translateShadowCasterProgramRef(GpuProgramType type, ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        Pass *pass = getPass(compiler, node);
-        if(!pass) return;
+        auto program = getProgram(compiler, node);
+        if(!program) return;
+        auto pass = any_cast<Pass*>(node->parent->context);
 
         compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
                            node->cls + ". Use shadow_caster_material instead");
-        pass->setShadowCasterVertexProgram(node->name);
-        if(pass->getShadowCasterVertexProgram()->isSupported())
-        {
-            GpuProgramParametersSharedPtr params = pass->getShadowCasterVertexProgramParameters();
-            GpuProgramTranslator::translateProgramParameters(compiler, params, node);
-        }
-    }
-    //-------------------------------------------------------------------------
-    void PassTranslator::translateShadowCasterFragmentProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
-    {
-        Pass *pass = getPass(compiler, node);
-        if(!pass) return;
 
-        compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
-                           node->cls + ". Use shadow_caster_material instead");
-        pass->setShadowCasterFragmentProgram(node->name);
-        if(pass->getShadowCasterFragmentProgram()->isSupported())
+        auto caster_mat = pass->getParent()->getShadowCasterMaterial();
+        if(!caster_mat)
         {
-            GpuProgramParametersSharedPtr params = pass->getShadowCasterFragmentProgramParameters();
+            auto src_mat = pass->getParent()->getParent();
+            // only first pass of this will be used
+            caster_mat = src_mat->clone(src_mat->getName()+"/CasterFallback");
+            pass->getParent()->setShadowCasterMaterial(caster_mat);
+        }
+        auto caster_pass = caster_mat->getTechnique(0)->getPass(0);
+
+        caster_pass->setGpuProgram(type, program);
+        if(program->isSupported())
+        {
+            GpuProgramParametersSharedPtr params = caster_pass->getGpuProgramParameters(type);
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
     //-------------------------------------------------------------------------
-    void PassTranslator::translateShadowReceiverVertexProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
+    void PassTranslator::translateShadowReceiverProgramRef(GpuProgramType type,ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        Pass *pass = getPass(compiler, node);
-        if(!pass) return;
+        auto program = getProgram(compiler, node);
+        if(!program) return;
+        auto pass = any_cast<Pass*>(node->parent->context);
 
         compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
                            node->cls + ". Use shadow_receiver_material instead");
-        pass->setShadowReceiverVertexProgram(node->name);
-        if(pass->getShadowReceiverVertexProgram()->isSupported())
-        {
-            GpuProgramParametersSharedPtr params = pass->getShadowReceiverVertexProgramParameters();
-            GpuProgramTranslator::translateProgramParameters(compiler, params, node);
-        }
-    }
-    //-------------------------------------------------------------------------
-    void PassTranslator::translateShadowReceiverFragmentProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
-    {
-        Pass *pass = getPass(compiler, node);
-        if(!pass) return;
 
-        compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
-                           node->cls + ". Use shadow_receiver_material instead");
-        pass->setShadowReceiverFragmentProgram(node->name);
-        if(pass->getShadowReceiverFragmentProgram()->isSupported())
+        auto receiver_mat = pass->getParent()->getShadowReceiverMaterial();
+        if(!receiver_mat)
         {
-            GpuProgramParametersSharedPtr params = pass->getShadowReceiverFragmentProgramParameters();
+            auto src_mat = pass->getParent()->getParent();
+            // only first pass of this will be used
+            receiver_mat = src_mat->clone(src_mat->getName()+"/ReceiverFallback");
+            pass->getParent()->setShadowReceiverMaterial(receiver_mat);
+        }
+        auto receiver_pass = receiver_mat->getTechnique(0)->getPass(0);
+
+        receiver_pass->setGpuProgram(type, program);
+        if(program->isSupported())
+        {
+            GpuProgramParametersSharedPtr params = receiver_pass->getGpuProgramParameters(type);
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
-    OGRE_IGNORE_DEPRECATED_END
     /**************************************************************************
      * TextureUnitTranslator
      *************************************************************************/
@@ -2668,10 +2673,8 @@ namespace Ogre{
                 case ID_TEXTURE_ALIAS:
                     compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
                         "texture_alias. Use 'texture $variable'");
-                    OGRE_IGNORE_DEPRECATED_BEGIN
                     if(getValue(prop, compiler, sval))
-                        mUnit->setTextureNameAlias(sval);
-                    OGRE_IGNORE_DEPRECATED_END
+                        mUnit->setName(sval);
                     break;
                 case ID_TEXTURE:
                     if(prop->values.empty())
@@ -3557,15 +3560,18 @@ namespace Ogre{
             }
 
             if (language == "asm")
+            {
+                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, obj->file, obj->line, "asm. Use syntax code.");
                 break; // always supported
-            if (HighLevelGpuProgramManager::getSingleton().isLanguageSupported(language))
+            }
+            if (GpuProgramManager::getSingleton().isLanguageSupported(language))
                 break;
         }
 
         translateGpuProgram(compiler, obj, language);
     }
     //-------------------------------------------------------------------------
-    void GpuProgramTranslator::translateGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj, const String& language)
+    void GpuProgramTranslator::translateGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj, String language)
     {
         String syntax;
         std::vector<String> delegates;
@@ -3645,20 +3651,14 @@ namespace Ogre{
         GpuProgramType gpt = translateIDToGpuProgramType(obj->id);
         GpuProgram *prog = 0;
 
-        bool isHighLevel = language != "asm";
-        CreateGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), source, syntax,
-                                                gpt);
-        OGRE_IGNORE_DEPRECATED_BEGIN
-        CreateHighLevelGpuProgramScriptCompilerEvent evtHL(obj->file, obj->name, compiler->getResourceGroup(), source,
-                                                         language, gpt);
-        OGRE_IGNORE_DEPRECATED_END
-        bool processed = compiler->_fireEvent(isHighLevel ? &evt : &evtHL, &prog);
+        if(language == "asm")
+            language = syntax;
+        CreateGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), source,
+                                                language, gpt);
+        bool processed = compiler->_fireEvent(&evt, &prog);
         if(!processed)
         {
-            if(isHighLevel)
-                prog = HighLevelGpuProgramManager::getSingleton().createProgram(obj->name, compiler->getResourceGroup(), language, gpt).get();
-            else
-                prog = GpuProgramManager::getSingleton().createProgram(obj->name, compiler->getResourceGroup(), source, gpt, syntax).get();
+            prog = GpuProgramManager::getSingleton().create(obj->name, compiler->getResourceGroup(), gpt, language).get();
 
             if(prog) // duplicate definition resolved by "use previous"
                 prog->setSourceFile(source);
@@ -3746,7 +3746,7 @@ namespace Ogre{
     //-------------------------------------------------------------------------
     void GpuProgramTranslator::translateProgramParameters(ScriptCompiler *compiler, GpuProgramParametersSharedPtr params, ObjectAbstractNode *obj)
     {
-        size_t animParametricsCount = 0;
+        uint32 animParametricsCount = 0;
 
         String value;
         for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
@@ -3828,79 +3828,6 @@ namespace Ogre{
                                                        "incorrect matrix4x4 declaration");
                                 }
                             }
-                            else if (atom1->value == "subroutine")
-                            {
-                                String s;
-                                if (getString(*k, &s))
-                                {
-                                    try
-                                    {
-                                        if (named)
-                                            params->setNamedSubroutine(name, s);
-                                        else
-                                            params->setSubroutine(index, s);
-                                    }
-                                    catch (Exception& e)
-                                    {
-                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                           e.getDescription());
-                                    }
-                                }
-                                else
-                                {
-                                    compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line,
-                                                       "incorrect subroutine declaration");
-                                }
-                            }
-                            // else if (atom1->value == "atomic_counter")
-                            // {
-                            //     //GpuProgramParameters::ElementType type = GpuProgramParameters::ET_INT; //FIXME
-                            //     int count = 0;
-                            //     if(atom1->value.size() > 14) {
-                            //         count = StringConverter::parseInt(atom1->value.substr(3));
-                            //         compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                            //                            "currently only a single atomic counter can be set at a time");
-                            //         break;
-                            //     }
-                            //     else
-                            //     {
-                            //         count = 1;
-                            //     }
-
-                            //     // First, clear out any offending auto constants
-                            //     if(named)
-                            //         params->clearNamedAutoConstant(name);
-                            //     else
-                            //         params->clearAutoConstant(index);
-
-                            //     // uint8 roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
-                            //     int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
-
-                            //     // uint32 *vals = OGRE_ALLOC_T(uint32, roundedCount, MEMCATEGORY_SCRIPTING);
-                            //     int *vals = OGRE_ALLOC_T(int, roundedCount, MEMCATEGORY_SCRIPTING);
-                            //     if(getInts(k, prop->values.end(), vals, roundedCount))
-                            //     {
-                            //         try
-                            //         {
-                            //             if(named)
-                            //                 params->setNamedConstant(name, vals, count, 1);
-                            //             else
-                            //                 params->setConstant(index, vals, roundedCount/4);
-                            //         }
-                            //         catch(...)
-                            //         {
-                            //             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                            //                                "setting of constant failed");
-                            //         }
-                            //     }
-                            //     else
-                            //     {
-                            //         compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
-                            //                            "incorrect integer constant declaration");
-                            //     }
-                            //     OGRE_FREE(vals, MEMCATEGORY_SCRIPTING);
-                            // }
-                            //TODO This should probably converted into a function of type.
                             else
                             {
                                 // GpuProgramParameters::ElementType type = GpuProgramParameters::ET_FLOAT;
@@ -4102,6 +4029,12 @@ namespace Ogre{
                                 switch(def->dataType)
                                 {
                                 case GpuProgramParameters::ACDT_NONE:
+                                    if (i2 != prop->values.end())
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file,
+                                                           prop->line, "unexpected <extraInfo> parameter");
+                                    }
+
                                     // Set the auto constant
                                     try
                                     {
@@ -4160,7 +4093,7 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
-                                                                   "extra parameters required by constant definition " + atom1->value);
+                                                                   "<extraInfo> parameter required by constant definition " + atom1->value);
                                             }
                                         }
                                         else
@@ -4202,7 +4135,7 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                                   "invalid auto constant extra info parameter");
+                                                                   "invalid auto constant <extraInfo> parameter");
                                             }
                                         }
                                     }
@@ -4251,13 +4184,13 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                                   "incorrect float argument definition in extra parameters");
+                                                                   "incorrect float argument definition in <extraInfo> parameter");
                                             }
                                         }
                                         else
                                         {
                                             compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
-                                                               "extra parameters required by constant definition " + atom1->value);
+                                                               "<extraInfo> parameter required by constant definition " + atom1->value);
                                         }
                                     }
                                     break;
@@ -4382,7 +4315,7 @@ namespace Ogre{
             }
 
             AbstractNodeList::const_iterator arrayStart = getNodeAt(prop->values, 2), arrayEnd = prop->values.end();
-            size_t arraySz = 1;
+            uint32 arraySz = 1;
 
             if (arrayStart != arrayEnd)
             {
@@ -4820,12 +4753,13 @@ namespace Ogre{
                         // Save the first atom, should be name
                         AtomAbstractNode *atom0 = (AtomAbstractNode*)(*it).get();
 
-                        size_t width = 0, height = 0;
+                        uint32 width = 0, height = 0;
                         float widthFactor = 1.0f, heightFactor = 1.0f;
                         bool widthSet = false, heightSet = false, formatSet = false;
                         bool pooled = false;
                         bool hwGammaWrite = false;
                         bool fsaa = true;
+                        auto type = TEX_TYPE_2D;
                         uint16 depthBufferId = DepthBuffer::POOL_DEFAULT;
                         CompositionTechnique::TextureScope scope = CompositionTechnique::TS_LOCAL;
                         Ogre::PixelFormatList formats;
@@ -4854,7 +4788,7 @@ namespace Ogre{
                             case ID_TARGET_HEIGHT_SCALED:
                                 {
                                     bool *pSetFlag;
-                                    size_t *pSize;
+                                    uint32 *pSize;
                                     float *pFactor;
 
                                     if (atom->id == ID_TARGET_WIDTH_SCALED)
@@ -4890,6 +4824,9 @@ namespace Ogre{
                                 break;
                             case ID_POOLED:
                                 pooled = true;
+                                break;
+                            case ID_CUBIC:
+                                type = TEX_TYPE_CUBE_MAP;
                                 break;
                             case ID_SCOPE_LOCAL:
                                 scope = CompositionTechnique::TS_LOCAL;
@@ -4970,6 +4907,7 @@ namespace Ogre{
                         CompositionTechnique::TextureDefinition *def = mTechnique->createTextureDefinition(atom0->value);
                         def->width = width;
                         def->height = height;
+                        def->type = type;
                         def->widthFactor = widthFactor;
                         def->heightFactor = heightFactor;
                         def->formatList = formats;
@@ -5048,11 +4986,18 @@ namespace Ogre{
         if(obj->id == ID_TARGET)
         {
             mTarget = technique->createTargetPass();
-            if(!obj->name.empty())
+            if(obj->name.empty())
             {
-                String name = obj->name;
+                compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, obj->file, obj->line);
+                return;
+            }
+            mTarget->setOutputName(obj->name);
 
-                mTarget->setOutputName(name);
+            if(!obj->values.empty())
+            {
+                int val;
+                if(getInt(obj->values.front(), &val))
+                    mTarget->setOutputSlice(val);
             }
         }
         else if(obj->id == ID_TARGET_OUTPUT)
@@ -5125,7 +5070,7 @@ namespace Ogre{
         // The name is the type of the pass
         if(obj->values.empty() || obj->values.front()->type != ANT_ATOM)
         {
-            compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, obj->file, obj->line);
+            compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, obj->file, obj->line, "pass type missing");
             return;
         }
 
@@ -5223,10 +5168,6 @@ namespace Ogre{
                     if(getValue(prop, compiler, bval))
                         mPass->setStencilTwoSidedOperation(bval);
                     break;
-                case ID_READ_BACK_AS_TEXTURE:
-                    if(getValue(prop, compiler, bval))
-                        mPass->setStencilReadBackAsTextureOperation(bval);
-                    break;
                 case ID_BUFFERS:
                     {
                         uint32 buffers = 0;
@@ -5285,7 +5226,12 @@ namespace Ogre{
                     {
                         ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::MATERIAL, sval);
                         compiler->_fireEvent(&evt, 0);
-                        mPass->setMaterialName(evt.mName);
+                        auto mat = MaterialManager::getSingleton().getByName(evt.mName, compiler->getResourceGroup());
+                        if (mat)
+                            mPass->setMaterial(mat);
+                        else
+                            compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, prop->file,
+                                               prop->line, evt.mName);
                     }
                     break;
                 case ID_INPUT:
@@ -5373,6 +5319,30 @@ namespace Ogre{
                         else
                         {
                             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                        }
+                    }
+                    break;
+                case ID_CAMERA:
+                    if(prop->values.empty())
+                    {
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
+                        return;
+                    }
+                    else if (prop->values.size() > 2)
+                    {
+                        compiler->addError(ScriptCompiler::CE_FEWERPARAMETERSEXPECTED, prop->file, prop->line);
+                        return;
+                    }
+                    else
+                    {
+                        if (!getValue(prop->values.front(), sval))
+                            return;
+                        mPass->setCameraName(sval);
+                        if (prop->values.back()->type == ANT_ATOM &&
+                            static_cast<AtomAbstractNode*>(prop->values.back().get())->id ==
+                                ID_ALIGN_TO_FACE)
+                        {
+                            mPass->setAlignCameraToFace(true);
                         }
                     }
                     break;

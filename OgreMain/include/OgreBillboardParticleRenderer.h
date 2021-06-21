@@ -51,68 +51,21 @@ namespace Ogre {
     */
     class _OgreExport BillboardParticleRenderer : public ParticleSystemRenderer
     {
-    protected:
         /// The billboard set that's doing the rendering
         BillboardSet* mBillboardSet;
+        Vector2 mStacksSlices;
     public:
         BillboardParticleRenderer();
         ~BillboardParticleRenderer();
 
-        /** Command object for billboard type (see ParamCommand).*/
-        class _OgrePrivate CmdBillboardType : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for billboard origin (see ParamCommand).*/
-        class _OgrePrivate CmdBillboardOrigin : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for billboard rotation type (see ParamCommand).*/
-        class _OgrePrivate CmdBillboardRotationType : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for common direction (see ParamCommand).*/
-        class _OgrePrivate CmdCommonDirection : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for common up-vector (see ParamCommand).*/
-        class _OgrePrivate CmdCommonUpVector : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for point rendering (see ParamCommand).*/
-        class _OgrePrivate CmdPointRendering : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-        /** Command object for accurate facing(see ParamCommand).*/
-        class _OgrePrivate CmdAccurateFacing : public ParamCommand
-        {
-        public:
-            String doGet(const void* target) const;
-            void doSet(void* target, const String& val);
-        };
-
         /// @copydoc BillboardSet::setTextureStacksAndSlices
         void setTextureStacksAndSlices(uchar stacks, uchar slices)
         {
+            mStacksSlices = Vector2(stacks, slices); // cache for get call
             mBillboardSet->setTextureStacksAndSlices(stacks, slices);
         }
+
+        const Vector2& getTextureStacksAndSlices() const { return mStacksSlices; }
 
         /// @copydoc BillboardSet::setBillboardType
         void setBillboardType(BillboardType bbt) { mBillboardSet->setBillboardType(bbt); }
@@ -153,7 +106,7 @@ namespace Ogre {
         const String& getType(void) const;
         /// @copydoc ParticleSystemRenderer::_updateRenderQueue
         void _updateRenderQueue(RenderQueue* queue, 
-            std::list<Particle*>& currentParticles, bool cullIndividually);
+            std::vector<Particle*>& currentParticles, bool cullIndividually);
         /// @copydoc ParticleSystemRenderer::visitRenderables
         void visitRenderables(Renderable::Visitor* visitor, bool debugRenderables = false)
         {
@@ -193,14 +146,8 @@ namespace Ogre {
         BillboardSet* getBillboardSet(void) const { return mBillboardSet; }
 
         void _notifyBoundingBox(const AxisAlignedBox& aabb) override;
-    protected:
-        static CmdBillboardType msBillboardTypeCmd;
-        static CmdBillboardOrigin msBillboardOriginCmd;
-        static CmdBillboardRotationType msBillboardRotationTypeCmd;
-        static CmdCommonDirection msCommonDirectionCmd;
-        static CmdCommonUpVector msCommonUpVectorCmd;
-        static CmdPointRendering msPointRenderingCmd;
-        static CmdAccurateFacing msAccurateFacingCmd;
+
+        void _notifyCastShadows(bool enabled) override { mBillboardSet->setCastShadows(enabled); }
     };
 
     /** Factory class for BillboardParticleRenderer */

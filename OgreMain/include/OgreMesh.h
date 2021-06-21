@@ -103,7 +103,7 @@ namespace Ogre {
         typedef std::vector<SubMesh*> SubMeshList;
         typedef std::vector<unsigned short> IndexMap;
 
-    protected:
+    private:
         /** A list of submeshes which make up this mesh.
             Each mesh is made up of 1 or more submeshes, which
             are each based on a single material and can have their
@@ -124,7 +124,7 @@ namespace Ogre {
         typedef std::unordered_map<String, ushort> SubMeshNameMap ;
 
         
-    protected:
+    private:
 
         DataStreamPtr mFreshFromDisk;
 
@@ -933,18 +933,6 @@ namespace Ogre {
             0 means the shared vertex data, 1+ means a submesh vertex data (index+1)
         */
         VertexData* getVertexDataByTrackHandle(unsigned short handle);
-        /** Iterates through all submeshes and requests them 
-            to apply their texture aliases to the material they use.
-        @remarks
-            The submesh will only apply texture aliases to the material if matching
-            texture alias names are found in the material.  If a match is found, the
-            submesh will automatically clone the original material and then apply its
-            texture to the new material.
-        @par
-            This method is normally called by the protected method loadImpl when a 
-            mesh if first loaded.
-        */
-        void updateMaterialForAllSubMeshes(void);
 
         /** Internal method which, if animation types have not been determined,
             scans any vertex animations and determines the type for each set of
@@ -964,14 +952,12 @@ namespace Ogre {
             A new Pose ready for population.
         */
         Pose* createPose(ushort target, const String& name = BLANKSTRING);
-        /** Get the number of poses.
-         * @deprecated use getPoseList() */
-        OGRE_DEPRECATED size_t getPoseCount(void) const { return mPoseList.size(); }
-        /** Retrieve an existing Pose by index.
-         * @deprecated use getPoseList() */
-        OGRE_DEPRECATED Pose* getPose(ushort index);
+        /** Get the number of poses */
+        size_t getPoseCount(void) const { return mPoseList.size(); }
+        /** Retrieve an existing Pose by index */
+        Pose* getPose(size_t index) const { return mPoseList.at(index); }
         /** Retrieve an existing Pose by name.*/
-        Pose* getPose(const String& name);
+        Pose* getPose(const String& name) const;
         /** Destroy a pose by index.
         @note
             This will invalidate any animation tracks referring to this pose or those after it.

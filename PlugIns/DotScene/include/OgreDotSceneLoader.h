@@ -6,7 +6,6 @@
 #include <OgreColourValue.h>
 #include <OgreQuaternion.h>
 #include <OgreResourceGroupManager.h>
-#include <OgreSceneLoader.h>
 #include <OgreString.h>
 #include <OgrePlugin.h>
 #include <OgreCodec.h>
@@ -22,7 +21,7 @@ namespace Ogre
 class SceneManager;
 class SceneNode;
 
-class _OgreDotScenePluginExport DotSceneLoader : public Ogre::SceneLoader
+class _OgreDotScenePluginExport DotSceneLoader
 {
 public:
     DotSceneLoader();
@@ -51,6 +50,9 @@ protected:
     void processParticleSystem(pugi::xml_node& XMLNode, Ogre::SceneNode* pParent);
     void processBillboardSet(pugi::xml_node& XMLNode, Ogre::SceneNode* pParent);
     void processPlane(pugi::xml_node& XMLNode, Ogre::SceneNode* pParent);
+    void processNodeAnimations(pugi::xml_node& XMLNode, Ogre::SceneNode* pParent);
+    void processNodeAnimation(pugi::xml_node& XMLNode, Ogre::SceneNode* pParent);
+    void processKeyframe(pugi::xml_node& XMLNode, Ogre::NodeAnimationTrack* pTrack);
 
     void processFog(pugi::xml_node& XMLNode);
     void processSkyBox(pugi::xml_node& XMLNode);
@@ -66,7 +68,7 @@ protected:
     Ogre::ColourValue mBackgroundColour;
 };
 
-class DotScenePlugin : public Plugin
+class _OgreDotScenePluginExport DotScenePlugin : public Plugin
 {
     const String& getName() const;
 

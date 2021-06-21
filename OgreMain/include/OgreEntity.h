@@ -86,7 +86,7 @@ namespace Ogre {
         typedef std::set<Entity*> EntitySet;
         typedef std::vector<std::pair<unsigned short, bool>> SchemeHardwareAnimMap;
         typedef std::vector<SubEntity*> SubEntityList;
-    protected:
+    private:
 
         /** Private constructor (instances cannot be created directly).
         */
@@ -309,7 +309,7 @@ namespace Ogre {
     public:
         /// Contains the child objects (attached to bones) indexed by name.
         typedef std::vector<MovableObject*> ChildObjectList;
-    protected:
+    private:
         ChildObjectList mChildObjectList;
 
 
@@ -319,9 +319,8 @@ namespace Ogre {
         ShadowRenderableList mShadowRenderables;
 
         /** Nested class to allow entity shadows. */
-        class _OgreExport EntityShadowRenderable : public ShadowRenderable
+        class EntityShadowRenderable : public ShadowRenderable
         {
-        protected:
             Entity* mParent;
             /// Shared link to position buffer.
             HardwareVertexBufferSharedPtr mPositionBuffer;
@@ -360,9 +359,8 @@ namespace Ogre {
         const MeshPtr& getMesh(void) const;
 
         /** Gets a pointer to a SubEntity, ie a part of an Entity.
-         @deprecated use getSubEntities()
         */
-        SubEntity* getSubEntity(size_t index) const;
+        SubEntity* getSubEntity(size_t index) const { return mSubEntityList.at(index); }
 
         /** Gets a pointer to a SubEntity by name
         @remarks 
@@ -371,9 +369,8 @@ namespace Ogre {
         SubEntity* getSubEntity( const String& name ) const;
 
         /** Retrieves the number of SubEntity objects making up this entity.
-        * @deprecated use getSubEntities()
         */
-        size_t getNumSubEntities(void) const;
+        size_t getNumSubEntities(void) const { return mSubEntityList.size(); }
 
         /** Retrieves SubEntity objects making up this entity.
         */
@@ -873,7 +870,7 @@ namespace Ogre {
     /** Factory object for creating Entity instances */
     class _OgreExport EntityFactory : public MovableObjectFactory
     {
-    protected:
+    private:
         MovableObject* createInstanceImpl( const String& name, const NameValuePairList* params);
     public:
         EntityFactory() {}

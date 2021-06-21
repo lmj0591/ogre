@@ -25,7 +25,7 @@ public:
 
     void cleanupContent()
     {
-        mSceneMgr->removeListener(mGpuConstants);
+        mSceneMgr->removeShadowTextureListener(mGpuConstants);
         delete mGpuConstants;
     }
 
@@ -35,12 +35,7 @@ public:
 
     void testCapabilities(const Ogre::RenderSystemCapabilities* caps)
     {
-        auto mat = MaterialManager::getSingleton().getByName("CSMShadows/Rockwall");
-        mat->load();
-        if (mat->getSupportedTechniques().empty())
-        {
-            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, mat->getUnsupportedTechniquesExplanation());
-        }
+        requireMaterial("CSMShadows/Rockwall");
     }
 
     void setupContent()
@@ -137,7 +132,7 @@ private:
         mSceneMgr->setShadowTextureCountPerLightType(Light::LT_DIRECTIONAL, NUM_CASCADES);
 
         mGpuConstants = new CSMGpuConstants(NUM_CASCADES);
-        mSceneMgr->addListener(mGpuConstants);
+        mSceneMgr->addShadowTextureListener(mGpuConstants);
 
         for (int i = 0; i < NUM_CASCADES; i++)
             mSceneMgr->setShadowTextureConfig(i, 1024, 1024, PF_FLOAT32_R);

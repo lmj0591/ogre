@@ -33,7 +33,6 @@ THE SOFTWARE.
 
 #include "OgreMovableObject.h"
 #include "OgreRenderable.h"
-#include "OgreRadixSort.h"
 #include "OgreCommon.h"
 #include "OgreResourceGroupManager.h"
 #include "OgreHeaderPrefix.h"
@@ -122,6 +121,8 @@ namespace Ogre {
         /** Private constructor (instances cannot be created directly).
         */
         BillboardSet();
+
+        bool getCastsShadows(void) const override { return getCastShadows(); }
 
         /// Bounds of all billboards in this set
         AxisAlignedBox mAABB;
@@ -273,8 +274,6 @@ namespace Ogre {
             SortByDistanceFunctor(const Vector3& pos);
             float operator()(Billboard* bill) const;
         };
-
-        static RadixSort<BillboardPool, Billboard*, float> mRadixSorter;
 
         /// Use point rendering?
         bool mPointRendering;
@@ -435,14 +434,16 @@ namespace Ogre {
         */
         virtual void removeBillboard(Billboard* pBill);
 
+        /// @name Billboard positioning
+        /// @{
         /** Sets the point which acts as the origin point for all billboards in this set.
 
             This setting controls the fine tuning of where a billboard appears in relation to it's
             position. It could be that a billboard's position represents it's center (e.g. for fireballs),
             it could mean the center of the bottom edge (e.g. a tree which is positioned on the ground),
             the top-left corner (e.g. a cursor).
-        @par
-            The default setting is BBO_CENTER.
+
+            The default setting is #BBO_CENTER.
         @param origin
             A member of the BillboardOrigin enum specifying the origin for all the billboards in this set.
         */
@@ -455,11 +456,11 @@ namespace Ogre {
         BillboardOrigin getBillboardOrigin(void) const { return mOriginType; }
 
         /** Sets billboard rotation type.
-        @remarks
+
             This setting controls the billboard rotation type, you can deciding rotate the billboard's vertices
             around their facing direction or rotate the billboard's texture coordinates.
-        @par
-            The default settings is BBR_TEXCOORD.
+
+            The default settings is #BBR_TEXCOORD.
         @param rotationType
             A member of the BillboardRotationType enum specifying the rotation type for all the billboards in this set.
         */
@@ -495,6 +496,7 @@ namespace Ogre {
         void setDefaultHeight(Real height) { mDefaultHeight = height; }
         /** See setDefaultDimensions - this gets 1 component individually. */
         Real getDefaultHeight(void) const { return mDefaultHeight; }
+        /// @}
 
         /** Sets the name of the material to be used for this billboard set.
         */
@@ -539,11 +541,6 @@ namespace Ogre {
         virtual void getRenderOperation(RenderOperation& op) override;
         virtual void getWorldTransforms(Matrix4* xform) const override;
 
-        /// @deprecated do not use
-        OGRE_DEPRECATED void _notifyBillboardResized() {}
-        /// @deprecated do not use
-        OGRE_DEPRECATED void _notifyBillboardRotated() {}
-
         /** Returns whether or not billboards in this are tested individually for culling. */
         bool getCullIndividually(void) const { return mCullIndividual; }
         /** Sets whether culling tests billboards in this individually as well as in a group.
@@ -568,24 +565,26 @@ namespace Ogre {
         */
         void setCullIndividually(bool cullIndividual) { mCullIndividual = cullIndividual; }
 
-        /** Sets the type of billboard to render.
-        @remarks
-            The default sort of billboard (BBT_POINT), always has both x and y axes parallel to 
+        /// @name Billboard orientation
+        /// @{
+        /** Sets the orientation behaviour of the billboards to render.
+
+            The default sort of billboard (#BBT_POINT), always has both x and y axes parallel to
             the camera's local axes. This is fine for 'point' style billboards (e.g. flares,
             smoke, anything which is symmetrical about a central point) but does not look good for
             billboards which have an orientation (e.g. an elongated raindrop). In this case, the
-            oriented billboards are more suitable (BBT_ORIENTED_COMMON or BBT_ORIENTED_SELF) since
+            oriented billboards are more suitable (#BBT_ORIENTED_COMMON or #BBT_ORIENTED_SELF) since
             they retain an independent Y axis and only the X axis is generated, perpendicular to both
             the local Y and the camera Z.
-        @par
+
             In some case you might want the billboard has fixed Z axis and doesn't need to face to
             camera (e.g. an aureola around the player and parallel to the ground). You can use
-            BBT_PERPENDICULAR_SELF which the billboard plane perpendicular to the billboard own
-            direction. Or BBT_PERPENDICULAR_COMMON which the billboard plane perpendicular to the
+            #BBT_PERPENDICULAR_SELF which the billboard plane perpendicular to the billboard own
+            direction. Or #BBT_PERPENDICULAR_COMMON which the billboard plane perpendicular to the
             common direction.
         @note
-            BBT_PERPENDICULAR_SELF and BBT_PERPENDICULAR_COMMON can't guarantee counterclockwise, you might
-            use double-side material (<b>cull_hardware node</b>) to ensure no billboard are culled.
+            #BBT_PERPENDICULAR_SELF and #BBT_PERPENDICULAR_COMMON can't guarantee counterclockwise, you might
+            use double-side material (#CULL_NONE) to ensure no billboard are culled.
         @param bbt The type of billboard to render
         */
         void setBillboardType(BillboardType bbt) { mBillboardType = bbt; }
@@ -593,38 +592,38 @@ namespace Ogre {
         /** Returns the billboard type in use. */
         BillboardType getBillboardType(void) const { return mBillboardType; }
 
-        /** Use this to specify the common direction given to billboards of type BBT_ORIENTED_COMMON or BBT_PERPENDICULAR_COMMON.
-        @remarks
-            Use BBT_ORIENTED_COMMON when you want oriented billboards but you know they are always going to 
+        /** Use this to specify the common direction given to billboards
+
+            Use #BBT_ORIENTED_COMMON when you want oriented billboards but you know they are always going to
             be oriented the same way (e.g. rain in calm weather). It is faster for the system to calculate
             the billboard vertices if they have a common direction.
-        @par
-            The common direction also use in BBT_PERPENDICULAR_COMMON, in this case the common direction
+
+            The common direction also use in #BBT_PERPENDICULAR_COMMON, in this case the common direction
             treat as Z axis, and an additional common up-vector was use to determine billboard X and Y
             axis.
+
+            @param vec The direction for all billboards. The vector is expected to be unit-length (normalised)
+
             @see setCommonUpVector
-        @param vec The direction for all billboards.
-        @note
-            The direction are use as is, never normalised in internal, user are supposed to normalise it himself.
         */
         void setCommonDirection(const Vector3& vec) { mCommonDirection = vec; }
 
         /** Gets the common direction for all billboards (BBT_ORIENTED_COMMON) */
         const Vector3& getCommonDirection(void) const { return mCommonDirection; }
 
-        /** Use this to specify the common up-vector given to billboards of type BBT_PERPENDICULAR_SELF or BBT_PERPENDICULAR_COMMON.
-        @remarks
-            Use BBT_PERPENDICULAR_SELF or BBT_PERPENDICULAR_COMMON when you want oriented billboards
+        /** Use this to specify the common up-vector given to billboards
+
+            Use #BBT_PERPENDICULAR_SELF or #BBT_PERPENDICULAR_COMMON when you want oriented billboards
             perpendicular to specify direction vector (or, Z axis), and doesn't face to camera.
             In this case, we need an additional up-vector to determine the billboard X and Y axis.
             The generated billboard plane and X-axis guarantee perpendicular to specify direction.
+
+            The specify direction is billboard own direction when billboard type is #BBT_PERPENDICULAR_SELF,
+            and it's shared common direction when billboard type is #BBT_PERPENDICULAR_COMMON.
+
+            @param vec The up-vector for all billboards. The vector is expected to be unit-length (normalised)
+
             @see setCommonDirection
-        @par
-            The specify direction is billboard own direction when billboard type is BBT_PERPENDICULAR_SELF,
-            and it's shared common direction when billboard type is BBT_PERPENDICULAR_COMMON.
-        @param vec The up-vector for all billboards.
-        @note
-            The up-vector are use as is, never normalised in internal, user are supposed to normalise it himself.
         */
         void setCommonUpVector(const Vector3& vec) { mCommonUpVector = vec; }
 
@@ -632,9 +631,7 @@ namespace Ogre {
         const Vector3& getCommonUpVector(void) const { return mCommonUpVector; }
 
         /** Sets whether or not billboards should use an 'accurate' facing model
-            based on the vector from each billboard to the camera, rather than 
-            an optimised version using just the camera direction.
-        @remarks
+
             By default, the axes for all billboards are calculated using the 
             camera's view direction, not the vector from the camera position to
             the billboard. The former is faster, and most of the time the difference
@@ -646,11 +643,12 @@ namespace Ogre {
         */
         void setUseAccurateFacing(bool acc) { mAccurateFacing = acc; }
         /** Gets whether or not billboards use an 'accurate' facing model
+
             based on the vector from each billboard to the camera, rather than 
             an optimised version using just the camera direction.
         */
         bool getUseAccurateFacing(void) const { return mAccurateFacing; }
-
+        /// @}
 
         virtual const String& getMovableType(void) const override;
         Real getSquaredViewDepth(const Camera* cam) const override;
@@ -681,6 +679,8 @@ namespace Ogre {
          */
         bool getBillboardsInWorldSpace() { return mWorldSpace; }
 
+        /// @name Billboard UV computation
+        /// @{
         /** BillboardSet can use custom texture coordinates for various billboards.
             This is useful for selecting one of many particle images out of a tiled 
             texture sheet, or doing flipbook animation within a single texture.
@@ -744,6 +744,7 @@ namespace Ogre {
 
         /// @deprecated
         OGRE_DEPRECATED Ogre::FloatRect const * getTextureCoords( uint16 * oNumCoords );
+        /// @}
 
         /** Set whether or not the BillboardSet will use point rendering
             rather than manually generated quads.

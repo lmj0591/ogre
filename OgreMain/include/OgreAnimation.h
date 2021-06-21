@@ -92,7 +92,7 @@ namespace Ogre {
 
     public:
         /** The types of animation interpolation available. */
-        enum InterpolationMode
+        enum InterpolationMode : uint8
         {
             /** Values are interpolated along straight lines. */
             IM_LINEAR,
@@ -101,7 +101,7 @@ namespace Ogre {
         };
 
         /** The types of rotational interpolation available. */
-        enum RotationInterpolationMode
+        enum RotationInterpolationMode : uint8
         {
             /** Values are interpolated linearly. This is faster but does not 
                 necessarily give a completely accurate result.
@@ -384,22 +384,22 @@ namespace Ogre {
         /// Fast access to NON-UPDATEABLE node track list
         const NodeTrackList& _getNodeTrackList(void) const;
 
-        /// Get non-updateable iterator over node tracks
-        NodeTrackIterator getNodeTrackIterator(void) const
+        /// @deprecated use _getNodeTrackList
+        OGRE_DEPRECATED NodeTrackIterator getNodeTrackIterator(void) const
         { return NodeTrackIterator(mNodeTrackList.begin(), mNodeTrackList.end()); }
         
         /// Fast access to NON-UPDATEABLE numeric track list
         const NumericTrackList& _getNumericTrackList(void) const;
 
-        /// Get non-updateable iterator over node tracks
-        NumericTrackIterator getNumericTrackIterator(void) const
+        /// @deprecated use _getNumericTrackList
+        OGRE_DEPRECATED NumericTrackIterator getNumericTrackIterator(void) const
         { return NumericTrackIterator(mNumericTrackList.begin(), mNumericTrackList.end()); }
 
         /// Fast access to NON-UPDATEABLE Vertex track list
         const VertexTrackList& _getVertexTrackList(void) const;
 
-        /// Get non-updateable iterator over node tracks
-        VertexTrackIterator getVertexTrackIterator(void) const
+        /// @deprecated use _getVertexTrackList
+        OGRE_DEPRECATED VertexTrackIterator getVertexTrackIterator(void) const
         { return VertexTrackIterator(mVertexTrackList.begin(), mVertexTrackList.end()); }
 
         /** Optimise an animation by removing unnecessary tracks and keyframes.
@@ -505,7 +505,7 @@ namespace Ogre {
         /** Retrieve the container of this animation. */
         AnimationContainer* getContainer();
         
-    protected:
+    private:
         /// Node tracks, indexed by handle
         NodeTrackList mNodeTrackList;
         /// Numeric tracks, indexed by handle
@@ -519,16 +519,16 @@ namespace Ogre {
         InterpolationMode mInterpolationMode;
         RotationInterpolationMode mRotationInterpolationMode;
 
+        /// Dirty flag indicate that keyframe time list need to rebuild
+        mutable bool mKeyFrameTimesDirty;
+        bool mUseBaseKeyFrame;
+
         static InterpolationMode msDefaultInterpolationMode;
         static RotationInterpolationMode msDefaultRotationInterpolationMode;
 
         /// Global keyframe time list used to search global keyframe index.
         typedef std::vector<Real> KeyFrameTimeList;
         mutable KeyFrameTimeList mKeyFrameTimes;
-        /// Dirty flag indicate that keyframe time list need to rebuild
-        mutable bool mKeyFrameTimesDirty;
-
-        bool mUseBaseKeyFrame;
         Real mBaseKeyFrameTime;
         String mBaseKeyFrameAnimationName;
         AnimationContainer* mContainer;

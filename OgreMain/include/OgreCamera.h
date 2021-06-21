@@ -50,7 +50,7 @@ namespace Ogre {
     */
 
     /** A viewpoint from which the scene will be rendered.
-    @remarks
+
         OGRE renders scenes from a camera viewpoint into a buffer of
         some sort, normally a window or a texture (a subclass of
         RenderTarget). OGRE cameras support both perspective projection (the default,
@@ -63,10 +63,21 @@ namespace Ogre {
         one camera can point at a single render target if required,
         each rendering to a subset of the target, allowing split screen
         and picture-in-picture views.
-    @par
+
+        At render time, all Scene Objects will be transformed in the camera space,
+        which is defined as:
+        - \f$+x\f$ is right
+        - \f$+y\f$ is up
+        - \f$-z\f$ is away
+
         Cameras maintain their own aspect ratios, field of view, and frustum,
-        and project co-ordinates into a space measured from -1 to 1 in x and y,
-        and 0 to 1 in z. At render time, the camera will be rendering to a
+        and project co-ordinates into normalised device coordinates measured from -1 to 1 in x and y,
+        and 0 to 1 in z, where
+        - \f$+x\f$ is right
+        - \f$+y\f$ is up
+        - \f$+z\f$ is away
+
+        At render time, the camera will be rendering to a
         Viewport which will translate these parametric co-ordinates into real screen
         co-ordinates. Obviously it is advisable that the viewport has the same
         aspect ratio as the camera to avoid distortion (unless you want it!).
@@ -95,7 +106,7 @@ namespace Ogre {
                         { (void)cam; }
 
         };
-    protected:
+    private:
         /// Is viewing window used.
         bool mWindowSet;
         /// Was viewing window changed.
@@ -113,9 +124,6 @@ namespace Ogre {
         /// Derived orientation/position of the camera, including reflection
         mutable Quaternion mDerivedOrientation;
         mutable Vector3 mDerivedPosition;
-
-        /// Rendering type
-        PolygonMode mSceneDetail;
 
         /// Stored number of visible faces in the last render
         unsigned int mVisFacesLastRender;
@@ -163,11 +171,15 @@ namespace Ogre {
         Frustum *mCullFrustum;
         /// Camera to use for LOD calculation
         const Camera* mLodCamera;
-        /// @see Camera::getPixelDisplayRatio
-        Real mPixelDisplayRatio;
 
         typedef std::vector<Listener*> ListenerList;
         ListenerList mListeners;
+        /// @see Camera::getPixelDisplayRatio
+        Real mPixelDisplayRatio;
+
+        SortMode mSortMode;
+        /// Rendering type
+        PolygonMode mSceneDetail;
 
         // Internal functions for calcs
         bool isViewOutOfDate(void) const;
@@ -378,9 +390,11 @@ namespace Ogre {
 #endif
         /** Tells the Camera to contact the SceneManager to render from it's viewpoint.
         @param vp The viewport to render to
-        @param includeOverlays Whether or not any overlay objects should be included
         */
-        void _renderScene(Viewport *vp, bool includeOverlays);
+        void _renderScene(Viewport *vp);
+
+        /// @deprecated do not use
+        OGRE_DEPRECATED void _renderScene(Viewport *vp, bool unused) { _renderScene(vp); }
 
         /** Function for outputting to a stream.
         */
@@ -434,7 +448,6 @@ namespace Ogre {
             rotation inherited from a node attachment. */
         Vector3 getRealRight(void) const;
 
-        void getWorldTransforms(Matrix4* mat) const override;
         const String& getMovableType(void) const override;
 
         /** Sets the level-of-detail factor for this Camera.
@@ -646,7 +659,11 @@ namespace Ogre {
             This parameter is used in min display size calculations.
         */
         Real getPixelDisplayRatio() const { return mPixelDisplayRatio; }
-        
+
+        /// Set the function used to compute the camera-distance for sorting Renderables
+        void setSortMode(SortMode sm) { mSortMode = sm; }
+        /// get the currently used @ref SortMode
+        SortMode getSortMode() const { return mSortMode; }
     };
     /** @} */
     /** @} */

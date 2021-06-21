@@ -139,23 +139,18 @@ ManualObject::ManualObject(const String& name)
     void ManualObject::begin(const String& materialName,
         RenderOperation::OperationType opType, const String& groupName)
     {
-        if (mCurrentSection)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "You cannot call begin() again until after you call end()",
-                "ManualObject::begin");
-        }
+        OgreAssert(!mCurrentSection, "You cannot call begin() again until after you call end()");
 
         // Check that a valid material was provided
         MaterialPtr material = MaterialManager::getSingleton().getByName(materialName, groupName);
 
         if(!material)
         {
-            LogManager::getSingleton().logMessage("Can't assign material " + materialName +
+            LogManager::getSingleton().logError("Can't assign material " + materialName +
                                                   " to the ManualObject " + mName + " because this "
                                                   "Material does not exist in group " + groupName +
                                                   ". Have you forgotten to define it in a "
-                                                  ".material script?", LML_CRITICAL);
+                                                  ".material script?");
 
             material = MaterialManager::getSingleton().getDefaultMaterial();
         }
@@ -172,12 +167,7 @@ ManualObject::ManualObject(const String& name)
     //-----------------------------------------------------------------------------
     void ManualObject::begin(const MaterialPtr& mat, RenderOperation::OperationType opType)
     {
-      if (mCurrentSection)
-      {
-          OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-              "You cannot call begin() again until after you call end()",
-              "ManualObject::begin");
-      }
+      OgreAssert(!mCurrentSection, "You cannot call begin() again until after you call end()");
 
       if (mat)
       {
@@ -201,19 +191,8 @@ ManualObject::ManualObject(const String& name)
     //-----------------------------------------------------------------------------
     void ManualObject::beginUpdate(size_t sectionIndex)
     {
-        if (mCurrentSection)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "You cannot call begin() again until after you call end()",
-                "ManualObject::beginUpdate");
-        }
-        if (sectionIndex >= mSectionList.size())
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "Invalid section index - out of range.",
-                "ManualObject::beginUpdate");
-        }
-        mCurrentSection = mSectionList[sectionIndex];
+        OgreAssert(!mCurrentSection, "You cannot call begin() again until after you call end()");
+        mCurrentSection = mSectionList.at(sectionIndex);
         mCurrentUpdating = true;
         mFirstVertex = true;
         mTexCoordIndex = 0;
@@ -296,9 +275,7 @@ ManualObject::ManualObject(const String& name)
                 OgreAssert(elem.getSemantic() != VES_DIFFUSE, "must use VET_COLOUR");
                 elem.baseVertexPointerToElement(pBase, &pFloat);
                 break;
-            case VET_COLOUR:
-            case VET_COLOUR_ABGR:
-            case VET_COLOUR_ARGB:
+            case VET_UBYTE4_NORM:
                 OgreAssert(elem.getSemantic() == VES_DIFFUSE, "must use VES_DIFFUSE");
                 elem.baseVertexPointerToElement(pBase, &pRGBA);
                 break;
@@ -307,8 +284,6 @@ ManualObject::ManualObject(const String& name)
                 break;
             };
 
-
-            RenderSystem* rs;
             unsigned short dims;
             switch(elem.getSemantic())
             {
@@ -333,27 +308,7 @@ ManualObject::ManualObject(const String& name)
                     *pFloat++ = mTempVertex.texCoord[elem.getIndex()][t];
                 break;
             case VES_DIFFUSE:
-                rs = Root::getSingleton().getRenderSystem();
-                if (rs)
-                {
-                    OGRE_IGNORE_DEPRECATED_BEGIN
-                    rs->convertColourValue(mTempVertex.colour, pRGBA++);
-                    OGRE_IGNORE_DEPRECATED_END
-                }
-                else
-                {
-                    switch(elem.getType())
-                    {
-                        case VET_COLOUR_ABGR:
-                            *pRGBA++ = mTempVertex.colour.getAsABGR();
-                            break;
-                        case VET_COLOUR_ARGB:
-                            *pRGBA++ = mTempVertex.colour.getAsARGB();
-                            break;
-                        default:
-                            *pRGBA++ = mTempVertex.colour.getAsRGBA();
-                    }
-                }
+                *pRGBA++ = mTempVertex.colour.getAsABGR();
                 break;
             default:
                 OgreAssert(false, "invalid semantic");
@@ -366,12 +321,7 @@ ManualObject::ManualObject(const String& name)
     //-----------------------------------------------------------------------------
     ManualObject::ManualObjectSection* ManualObject::end(void)
     {
-        if (!mCurrentSection)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "You cannot call end() until after you call begin()",
-                "ManualObject::end");
-        }
+        OgreAssert(mCurrentSection, "You cannot call end() until after you call begin()");
         if (mTempVertexPending)
         {
             // bake current vertex
@@ -495,46 +445,12 @@ ManualObject::ManualObject(const String& name)
         return result;
     }
     //-----------------------------------------------------------------------------
-    void ManualObject::setMaterialName(size_t idx, const String& name, const String& group)
-    {
-        if (idx >= mSectionList.size())
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "Index out of bounds!",
-                "ManualObject::setMaterialName");
-        }
-
-        mSectionList[idx]->setMaterialName(name, group);
-
-    }
-    //-----------------------------------------------------------------------------
-    void ManualObject::setMaterial(size_t subIndex, const MaterialPtr &mat)
-    {
-        if (subIndex >= mSectionList.size())
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "Index out of bounds!",
-                "ManualObject::setMaterial");
-        }
-
-        mSectionList[subIndex]->setMaterial(mat);
-    }
-    //-----------------------------------------------------------------------------
     MeshPtr ManualObject::convertToMesh(const String& meshName, const String& groupName)
     {
-        if (mCurrentSection)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "You cannot call convertToMesh() whilst you are in the middle of "
-                "defining the object; call end() first.",
-                "ManualObject::convertToMesh");
-        }
-        if (mSectionList.empty())
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                "No data defined to convert to a mesh.",
-                "ManualObject::convertToMesh");
-        }
+        OgreAssert(!mCurrentSection, "You cannot call convertToMesh() whilst you are in the middle of "
+                                     "defining the object; call end() first.");
+        OgreAssert(!mSectionList.empty(), "No data defined to convert to a mesh.");
+
         MeshPtr m = MeshManager::getSingleton().createManual(meshName, groupName);
 
         for (auto sec : mSectionList)
@@ -574,20 +490,6 @@ ManualObject::ManualObject(const String& name)
 
         // Save setting for future sections
         mUseIdentityView = useIdentityView;
-    }
-    //-----------------------------------------------------------------------
-    ManualObject::ManualObjectSection* ManualObject::getSection(unsigned int inIndex) const
-    {
-        if (inIndex >= mSectionList.size())
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-            "Index out of bounds.",
-            "ManualObject::getSection");
-        return mSectionList[inIndex];
-    }
-    //-----------------------------------------------------------------------
-    unsigned int ManualObject::getNumSections(void) const
-    {
-        return static_cast< unsigned int >( mSectionList.size() );
     }
     //-----------------------------------------------------------------------------
     const String& ManualObject::getMovableType(void) const

@@ -101,14 +101,12 @@ namespace Ogre {
 
     void X11EGLWindow::getLeftAndTopFromNativeWindow( int & left, int & top, uint width, uint height )
     {
-        NativeDisplayType mNativeDisplay = mGLSupport->getNativeDisplay();
         left = DisplayWidth((Display*)mNativeDisplay, DefaultScreen(mNativeDisplay))/2 - width/2;
         top  = DisplayHeight((Display*)mNativeDisplay, DefaultScreen(mNativeDisplay))/2 - height/2;
     }
 
     void X11EGLWindow::initNativeCreatedWindow(const NameValuePairList *miscParams)
     {
-        mExternalWindow = 0;
         mNativeDisplay = mGLSupport->getNativeDisplay();
         mParentWindow = DefaultRootWindow((Display*)mNativeDisplay);
 
@@ -117,13 +115,14 @@ namespace Ogre {
             NameValuePairList::const_iterator opt;
             NameValuePairList::const_iterator end = miscParams->end();
 
-            if ((opt = miscParams->find("parentWindowHandle")) != end)
+            if ((opt = miscParams->find("parentWindowHandle")) != end ||
+                (opt = miscParams->find("externalWindowHandle")) != end)
             {
                 StringVector tokens = StringUtil::split(opt->second, " :");
 
-                if (tokens.size() == 3)
+                if (tokens.size() >= 3)
                 {
-                    // deprecated display:screen:xid format
+                    // deprecated display:screen:xid:visualinfo format
                     mParentWindow = (Window)StringConverter::parseSizeT(tokens[2]);
                 }
                 else
@@ -132,32 +131,6 @@ namespace Ogre {
                     mParentWindow = (Window)StringConverter::parseSizeT(tokens[0]);
                 }
             }
-            else if ((opt = miscParams->find("externalWindowHandle")) != end)
-            {
-                //std::vector<String> tokens = StringUtil::split(opt->second, " :");
-                        StringVector tokens = StringUtil::split(opt->second, " :");
-
-                LogManager::getSingleton().logMessage(
-                    "EGLWindow::create: The externalWindowHandle parameter is deprecated.\n"
-                    "Use the parentWindowHandle or currentGLContext parameter instead.");
-                if (tokens.size() == 3)
-                {
-                    // Old display:screen:xid format
-                    // The old EGL code always created a "parent" window in this case:
-                    mParentWindow = (Window)StringConverter::parseSizeT(tokens[2]);
-                }
-                else if (tokens.size() == 4)
-                {
-                    // Old display:screen:xid:visualinfo format
-                    mExternalWindow = (Window)StringConverter::parseSizeT(tokens[2]);
-                }
-                else
-                {
-                    // xid format
-                    mExternalWindow = (Window)StringConverter::parseSizeT(tokens[0]);
-                }
-            }
-
         }
 
         // Ignore fatal XErrorEvents during parameter validation:
@@ -172,26 +145,8 @@ namespace Ogre {
                 windowAttrib.root != DefaultRootWindow((Display*)mNativeDisplay))
             {
                 OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                    "Invalid parentWindowHandle (wrong server or screen)",
-                    "EGLWindow::create");
+                            "Invalid parentWindowHandle (wrong server or screen)");
             }
-        }
-
-        // Validate externalWindowHandle
-        if (mExternalWindow != 0)
-        {
-            XWindowAttributes windowAttrib;
-
-            if (!XGetWindowAttributes((Display*)mNativeDisplay, mExternalWindow, &windowAttrib) ||
-                windowAttrib.root != DefaultRootWindow((Display*)mNativeDisplay))
-            {
-                OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                    "Invalid externalWindowHandle (wrong server or screen)",
-                    "EGLWindow::create");
-            }
-
-            mEglConfig = 0;
-            mEglSurface = createSurfaceFromWindow(mEglDisplay, (NativeWindowType)mExternalWindow);
         }
 
         XSetErrorHandler(oldXErrorHandler);
@@ -332,20 +287,17 @@ namespace Ogre {
 
         if (width != 0 && height != 0)
         {
-            if (mIsTopLevel)
-            { 
-                XResizeWindow((Display*)mGLSupport->getNativeDisplay(), (Window)mWindow, width, height);
-            }
-            else
+            if (!mIsTopLevel)
             {
-                mWidth = width;
-                mHeight = height;
-
-                for (ViewportList::iterator it = mViewportList.begin(); it != mViewportList.end(); ++it)
-                {
-                    (*it).second->_updateDimensions();
-                }
+                XResizeWindow(mGLSupport->getNativeDisplay(), mWindow, width, height);
+                XFlush(mGLSupport->getNativeDisplay());
             }
+
+            mWidth = width;
+            mHeight = height;
+
+            for (ViewportList::iterator it = mViewportList.begin(); it != mViewportList.end(); ++it)
+                (*it).second->_updateDimensions();
         }
     }
 
@@ -354,7 +306,6 @@ namespace Ogre {
         if (mClosed || !mWindow)
             return;
 
-        NativeDisplayType mNativeDisplay = mGLSupport->getNativeDisplay();
         XWindowAttributes windowAttrib;
 
         Window parent, root, *children;
@@ -376,26 +327,12 @@ namespace Ogre {
             XGetWindowAttributes((Display*)mNativeDisplay, (Window)mWindow, &windowAttrib);
         }
 
-        if (mWidth == uint32(windowAttrib.width) && mHeight == uint32(windowAttrib.height))
-            return;
-
-        mWidth = windowAttrib.width;
-        mHeight = windowAttrib.height;
-
-        if(!mIsTopLevel)
-        {
-            XResizeWindow((Display*)mNativeDisplay, mWindow, mWidth, mHeight);
-            XFlush((Display*)mNativeDisplay);
-        }
-
-        for (ViewportList::iterator it = mViewportList.begin(); it != mViewportList.end(); ++it)
-            (*it).second->_updateDimensions();
+        resize(windowAttrib.width, windowAttrib.height);
     }
     void X11EGLWindow::switchFullScreen(bool fullscreen)
     { 
         if (mGLSupport->mAtomFullScreen != None)
         {
-            NativeDisplayType mNativeDisplay = mGLSupport->getNativeDisplay();
             XClientMessageEvent xMessage;
 
             xMessage.type = ClientMessage;
@@ -431,6 +368,7 @@ namespace Ogre {
 
         unsigned int vsyncInterval = 1;
 
+        mNativeDisplay = mGLSupport->getNativeDisplay();
         getLeftAndTopFromNativeWindow(left, top, width, height);
 
         mIsFullScreen = fullScreen;
@@ -473,6 +411,9 @@ namespace Ogre {
             {
                 vsync = StringConverter::parseBool(opt->second);
             }
+
+            if((opt = miscParams->find("vsyncInterval")) != end)
+                vsyncInterval = StringConverter::parseUnsignedInt(opt->second);
 
             if ((opt = miscParams->find("gamma")) != end)
             {
@@ -574,27 +515,13 @@ namespace Ogre {
         setVSyncInterval(vsyncInterval);
         setVSyncEnabled(vsync);
 
-        int Rsz, Gsz, Bsz, Asz, fsaa;
-        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_RED_SIZE, &Rsz);
-        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_BLUE_SIZE, &Gsz);
-        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_GREEN_SIZE, &Bsz);
-        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_ALPHA_SIZE, &Asz);
-        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_SAMPLES, &fsaa);
-
-        LogManager::getSingleton().logMessage(
-            StringUtil::format("X11EGLWindow::create colourBufferSize=%d/%d/%d/%d gamma=%d FSAA=%d", Rsz,
-                               Bsz, Gsz, Asz, mHwGamma, fsaa));
-
         mName = name;
         mWidth = width;
         mHeight = height;
         mLeft = left;
         mTop = top;
-        mActive = true;
-        mVisible = true;
-        mFSAA = fsaa;
 
-        mClosed = false;
+        finaliseWindow();
     }
 
 }

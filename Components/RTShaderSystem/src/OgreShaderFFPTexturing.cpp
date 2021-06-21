@@ -301,13 +301,15 @@ bool FFPTexturing::addPSFunctionInvocations(TextureUnitParams* textureUnitParams
             
     // Add texture sampling code.
     ParameterPtr texel = psMain->resolveLocalParameter(GCT_FLOAT4, c_ParamTexelEx + StringConverter::toString(textureUnitParams->mTextureSamplerIndex));
-    addPSSampleTexelInvocation(textureUnitParams, psMain, texel, FFP_PS_SAMPLING);
 
     // Build colour argument for source1.
     source1 = getPSArgument(texel, colourBlend.source1, colourBlend.colourArg1, colourBlend.alphaArg1, false);
 
     // Build colour argument for source2.
     source2 = getPSArgument(texel, colourBlend.source2, colourBlend.colourArg2, colourBlend.alphaArg2, false);
+
+    if(source1 == texel || source2 == texel || colourBlend.operation == LBX_BLEND_TEXTURE_ALPHA)
+        addPSSampleTexelInvocation(textureUnitParams, psMain, texel, FFP_PS_SAMPLING);
 
     bool needDifferentAlphaBlend = false;
     if (alphaBlend.operation != colourBlend.operation ||
@@ -333,6 +335,9 @@ bool FFPTexturing::addPSFunctionInvocations(TextureUnitParams* textureUnitParams
 
         // Build alpha argument for source2.
         source2 = getPSArgument(texel, alphaBlend.source2, alphaBlend.colourArg2, alphaBlend.alphaArg2, true);
+
+        if(source1 == texel || source2 == texel || alphaBlend.operation == LBX_BLEND_TEXTURE_ALPHA)
+            addPSSampleTexelInvocation(textureUnitParams, psMain, texel, FFP_PS_SAMPLING);
 
         // Build alpha blend
         addPSBlendInvocations(psMain, source1, source2, texel,
@@ -613,7 +618,7 @@ void FFPTexturing::setTextureUnit(unsigned short index, TextureUnitState* textur
     curParams.mTextureSamplerIndex = index;
     curParams.mTextureUnitState    = textureUnitState;
 
-    bool isGLES2 = Root::getSingletonPtr()->getRenderSystem()->getName().find("OpenGL ES 2") != String::npos;
+    bool isGLES2 = ShaderGenerator::getSingleton().getTargetLanguage() == "glsles";
 
     switch (curParams.mTextureUnitState->getTextureType())
     {
@@ -625,10 +630,6 @@ void FFPTexturing::setTextureUnit(unsigned short index, TextureUnitState* textur
         OGRE_FALLTHROUGH;
     case TEX_TYPE_2D:
         curParams.mTextureSamplerType = GCT_SAMPLER2D;
-        curParams.mVSInTextureCoordinateType = GCT_FLOAT2;
-        break;
-    case TEX_TYPE_2D_RECT:
-        curParams.mTextureSamplerType = GCT_SAMPLERRECT;
         curParams.mVSInTextureCoordinateType = GCT_FLOAT2;
         break;
     case TEX_TYPE_EXTERNAL_OES:
@@ -651,6 +652,14 @@ void FFPTexturing::setTextureUnit(unsigned short index, TextureUnitState* textur
 
      curParams.mVSOutTextureCoordinateType = curParams.mVSInTextureCoordinateType;
      curParams.mTexCoordCalcMethod = getTexCalcMethod(curParams.mTextureUnitState);
+
+    // let TexCalcMethod override texture type, as it might be wrong for
+    // content_type shadow & content_type compositor
+    if (curParams.mTexCoordCalcMethod == TEXCALC_ENVIRONMENT_MAP_REFLECTION)
+    {
+        curParams.mVSOutTextureCoordinateType = GCT_FLOAT3;
+        curParams.mTextureSamplerType = GCT_SAMPLERCUBE;
+    }
 
      if (curParams.mTexCoordCalcMethod == TEXCALC_PROJECTIVE_TEXTURE)
          curParams.mVSOutTextureCoordinateType = GCT_FLOAT3;    

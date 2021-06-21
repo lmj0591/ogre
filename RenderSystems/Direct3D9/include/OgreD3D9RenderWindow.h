@@ -57,7 +57,6 @@ namespace Ogre
         void                setVSyncEnabled     (bool vsync);
         bool                isVSyncEnabled      () const;
         void                setVSyncInterval    (unsigned int interval);
-        unsigned int        getVSyncInterval    () const;
         void                reposition          (int left, int top);
         void                resize              (unsigned int width, unsigned int height);
         void                swapBuffers         ();
@@ -70,6 +69,7 @@ namespace Ogre
         
         /** Overridden - see RenderTarget.
         */
+        PixelFormat         suggestPixelFormat() const override;
         void                copyContentsToMemory    (const Box& src, const PixelBox &dst, FrameBuffer buffer);
         bool                requiresTextureFlipping () const { return false; }
 
@@ -138,12 +138,12 @@ namespace Ogre
         DWORD                       mFSAAQuality;           // AA quality.
         UINT                        mDisplayFrequency;      // Display frequency.
         bool                        mVSync;                 // Use vertical sync or not.
-        unsigned int                mVSyncInterval;         // The vsync interval.
         bool                        mUseNVPerfHUD;          // Use NV Perf HUD.
         DWORD                       mWindowedWinStyle;      // Windowed mode window style flags.
         DWORD                       mFullscreenWinStyle;    // Fullscreen mode window style flags.       
         unsigned int                mDesiredWidth;          // Desired width after resizing
         unsigned int                mDesiredHeight;         // Desired height after resizing
+        uint32                      mColourDepth;
     };
 }
 #endif

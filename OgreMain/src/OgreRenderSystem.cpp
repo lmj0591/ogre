@@ -91,10 +91,9 @@ namespace Ogre {
         if(mFixedFunctionParams)
             return;
 
-        GpuLogicalBufferStructPtr nullPtr;
         GpuLogicalBufferStructPtr logicalBufferStruct(new GpuLogicalBufferStruct());
         mFixedFunctionParams.reset(new GpuProgramParameters);
-        mFixedFunctionParams->_setLogicalIndexes(logicalBufferStruct, nullPtr, nullPtr);
+        mFixedFunctionParams->_setLogicalIndexes(logicalBufferStruct);
         mFixedFunctionParams->setAutoConstant(0, GpuProgramParameters::ACT_WORLD_MATRIX);
         mFixedFunctionParams->setAutoConstant(4, GpuProgramParameters::ACT_VIEW_MATRIX);
         mFixedFunctionParams->setAutoConstant(8, GpuProgramParameters::ACT_PROJECTION_MATRIX);
@@ -121,7 +120,7 @@ namespace Ogre {
         }
     }
 
-    void RenderSystem::setFFPLightParams(size_t index, bool enabled)
+    void RenderSystem::setFFPLightParams(uint32 index, bool enabled)
     {
         if(!mFixedFunctionParams)
             return;
@@ -196,10 +195,12 @@ namespace Ogre {
             miscParams.emplace("FSAA", std::to_string(fsaa));
 
             // D3D specific
-            String hint;
-            fsaaMode >> hint;
             if(!fsaaMode.eof())
+            {
+                String hint;
+                fsaaMode >> hint;
                 miscParams.emplace("FSAAHint", hint);
+            }
         }
 
         if((opt = mOptions.find("VSync")) != end)
@@ -347,77 +348,6 @@ namespace Ogre {
 
         return NULL;
     }
-
-    bool RenderSystem::_createRenderWindows(const RenderWindowDescriptionList& renderWindowDescriptions, 
-        RenderWindowList& createdWindows)
-    {
-        unsigned int fullscreenWindowsCount = 0;
-
-        // Grab some information and avoid duplicate render windows.
-        for (unsigned int nWindow=0; nWindow < renderWindowDescriptions.size(); ++nWindow)
-        {
-            const RenderWindowDescription* curDesc = &renderWindowDescriptions[nWindow];
-
-            // Count full screen windows.
-            if (curDesc->useFullScreen)         
-                fullscreenWindowsCount++;   
-
-            bool renderWindowFound = false;
-
-            if (mRenderTargets.find(curDesc->name) != mRenderTargets.end())
-                renderWindowFound = true;
-            else
-            {
-                for (unsigned int nSecWindow = nWindow + 1 ; nSecWindow < renderWindowDescriptions.size(); ++nSecWindow)
-                {
-                    if (curDesc->name == renderWindowDescriptions[nSecWindow].name)
-                    {
-                        renderWindowFound = true;
-                        break;
-                    }                   
-                }
-            }
-
-            // Make sure we don't already have a render target of the 
-            // same name as the one supplied
-            if(renderWindowFound)
-            {
-                String msg;
-
-                msg = "A render target of the same name '" + String(curDesc->name) + "' already "
-                    "exists.  You cannot create a new window with this name.";
-                OGRE_EXCEPT( Exception::ERR_INTERNAL_ERROR, msg, "RenderSystem::createRenderWindow" );
-            }
-        }
-        
-        // Case we have to create some full screen rendering windows.
-        if (fullscreenWindowsCount > 0)
-        {
-            // Can not mix full screen and windowed rendering windows.
-            if (fullscreenWindowsCount != renderWindowDescriptions.size())
-            {
-                OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
-                    "Can not create mix of full screen and windowed rendering windows",
-                    "RenderSystem::createRenderWindows");
-            }                   
-        }
-
-        // Simply call _createRenderWindow in a loop.
-        for (const auto& curRenderWindowDescription : renderWindowDescriptions)
-        {
-            RenderWindow* curWindow = NULL;
-            curWindow = _createRenderWindow(curRenderWindowDescription.name,
-                                            curRenderWindowDescription.width,
-                                            curRenderWindowDescription.height,
-                                            curRenderWindowDescription.useFullScreen,
-                                            &curRenderWindowDescription.miscParams);
-
-            createdWindows.push_back(curWindow);
-        }
-
-        return true;
-    }
-
     //---------------------------------------------------------------------------------------------
     void RenderSystem::destroyRenderWindow(const String& name)
     {
@@ -782,13 +712,6 @@ namespace Ogre {
         return static_cast< unsigned int >( mVertexCount );
     }
     //-----------------------------------------------------------------------
-    void RenderSystem::convertColourValue(const ColourValue& colour, uint32* pDest)
-    {
-        OGRE_IGNORE_DEPRECATED_BEGIN
-        *pDest = VertexElement::convertColourValue(colour, getColourVertexElementType());
-        OGRE_IGNORE_DEPRECATED_END
-    }
-    //-----------------------------------------------------------------------
     void RenderSystem::_render(const RenderOperation& op)
     {
         // Update stats
@@ -873,6 +796,13 @@ namespace Ogre {
     {
         if (mCurrentPassIterationCount <= 1)
             return false;
+
+        // Update derived depth bias
+        if (mDerivedDepthBias)
+        {
+            _setDepthBias(mDerivedDepthBiasBase + mDerivedDepthBiasMultiplier * mCurrentPassIterationNum,
+                          mDerivedDepthBiasSlopeScale);
+        }
 
         --mCurrentPassIterationCount;
         ++mCurrentPassIterationNum;
@@ -1130,6 +1060,16 @@ namespace Ogre {
         optVSync.currentValue = optVSync.possibleValues[1];
         mOptions[optVSync.name] = optVSync;
 
+        ConfigOption optVSyncInterval;
+        optVSyncInterval.name = "VSync Interval";
+        optVSyncInterval.immutable = false;
+        optVSyncInterval.possibleValues.push_back("1");
+        optVSyncInterval.possibleValues.push_back("2");
+        optVSyncInterval.possibleValues.push_back("3");
+        optVSyncInterval.possibleValues.push_back("4");
+        optVSyncInterval.currentValue = optVSyncInterval.possibleValues[0];
+        mOptions[optVSyncInterval.name] = optVSyncInterval;
+
         ConfigOption optSRGB;
         optSRGB.name = "sRGB Gamma Conversion";
         optSRGB.immutable = false;
@@ -1167,5 +1107,27 @@ namespace Ogre {
         }
     }
 
+    void RenderSystem::setStencilCheckEnabled(bool enabled)
+    {
+        mStencilState.enabled = enabled;
+        if (!enabled)
+            setStencilState(mStencilState);
+    }
+    void RenderSystem::setStencilBufferParams(CompareFunction func, uint32 refValue, uint32 compareMask,
+                                              uint32 writeMask, StencilOperation stencilFailOp,
+                                              StencilOperation depthFailOp, StencilOperation passOp,
+                                              bool twoSidedOperation)
+    {
+        mStencilState.compareOp = func;
+        mStencilState.referenceValue = refValue;
+        mStencilState.compareMask = compareMask;
+        mStencilState.writeMask = writeMask;
+        mStencilState.stencilFailOp = stencilFailOp;
+        mStencilState.depthFailOp = depthFailOp;
+        mStencilState.depthStencilPassOp = passOp;
+        mStencilState.twoSidedOperation = twoSidedOperation;
+        if(mStencilState.enabled)
+            setStencilState(mStencilState);
+    }
 }
 

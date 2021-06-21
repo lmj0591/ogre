@@ -27,47 +27,24 @@ licenses when distributing an application since most require you to
 include the license in your documentation. All the license texts are
 included in the Docs/licenses folder.
 
-### Zlib
+### zip
 
 <table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
 <tbody>
 
 <tr>
 <td style="width: 20%;">Original Authors:</td>
-<td>Jean-loup Gailly and Mark Adler</td>
+<td>Rich Geldreich and Kuba Podgórski</td>
 </tr>
 
 <tr>
 <td>Website:</td>
-<td>http://www.zlib.net</td>
+<td>https://github.com/kuba--/zip</td>
 </tr>
 
 <tr>
 <td>Licensed Under:</td>
-<td><a href="licenses/zlib.txt">Zlib License</a></td>
-</tr>
-
-</tbody>
-</table>
-
-### Zziplib
-
-<table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
-<tbody>
-
-<tr>
-<td style="width: 20%;">Original Author:</td>
-<td>Guido Draheim</td>
-</tr>
-
-<tr>
-<td>Website:</td>
-<td>http://zziplib.sourceforge.net</td>
-</tr>
-
-<tr>
-<td>Licensed Under:</td>
-<td><a href="licenses/mpl.txt">Mozilla Public License 1.1</a></td>
+<td><a href="https://unlicense.org/">Unlicense (Public Domain)</a></td>
 </tr>
 
 </tbody>
@@ -288,6 +265,7 @@ Licensed Under:</td>
     <li>
         <p>Battle Damaged Sci-fi Helmet - PBR by theblueturtle_, published under a Creative Commons Attribution-NonCommercial license</p>
     </li>
+    <li>
+        <p>Smoke15Frames.png by Beast, published under CC-0 https://opengameart.org/content/smoke-aura</p>
+    </li>
 </ul>
-
-<p>Copyright &copy; 2013 by The OGRE Team</p>

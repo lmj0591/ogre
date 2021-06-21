@@ -124,9 +124,8 @@ namespace Ogre
         */
         virtual void resize(unsigned int widthPt, unsigned int heightPt) = 0;
 
-        /** Notify that the window has been resized
-        @remarks
-            You don't need to call this unless you created the window externally.
+        /** Query the current size and position from an external window handle.
+            @note most of the time you already know the size and should call @ref resize instead.
         */
         virtual void windowMovedOrResized() {}
 
@@ -175,7 +174,7 @@ namespace Ogre
 
         /** Returns the vertical sync interval. 
         */
-        virtual unsigned int getVSyncInterval() const { return 1; }
+        unsigned int getVSyncInterval() const { return mVSyncInterval; }
         
 
         /** Overridden from RenderTarget, flags invisible windows as inactive
@@ -201,11 +200,7 @@ namespace Ogre
         /** Overloaded version of getMetrics from RenderTarget, including extra details
             specific to windowing systems. Result is in pixels.
         */
-        virtual void getMetrics(unsigned int& width, unsigned int& height, unsigned int& colourDepth, 
-            int& left, int& top) const;
-
-        /// @copydoc RenderTarget::getMetrics
-        using RenderTarget::getMetrics;
+        void getMetrics(unsigned int& width, unsigned int& height, int& left, int& top) const;
 
         /// Override since windows don't usually have alpha
         PixelFormat suggestPixelFormat() const { return PF_BYTE_RGB; }
@@ -231,6 +226,7 @@ namespace Ogre
         bool mAutoDeactivatedOnFocusChange;
         int mLeft;
         int mTop;
+        unsigned int mVSyncInterval;
         
         /** Indicates that this is the primary window. Only to be called by
             Ogre::Root

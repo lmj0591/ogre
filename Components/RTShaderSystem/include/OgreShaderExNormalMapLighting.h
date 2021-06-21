@@ -43,10 +43,6 @@ namespace RTShader {
 *  @{
 */
 
-#define SGX_LIB_NORMALMAP                           "SGXLib_NormalMap"
-#define SGX_FUNC_CONSTRUCT_TBNMATRIX                "SGX_ConstructTBNMatrix"
-#define SGX_FUNC_FETCHNORMAL                        "SGX_FetchNormal"
-
 /** Normal Map Lighting extension sub render state implementation.
 Derives from SubRenderState class.
 */
@@ -137,16 +133,6 @@ public:
     Return the normal map texture name.
     */
     const String& getNormalMapTextureName() const { return mNormalMapTextureName; }
-
-    /// @deprecated use setNormalMapSampler
-    void setNormalMapFiltering(const FilterOptions minFilter, const FilterOptions magFilter, const FilterOptions mipFilter) 
-    { mNormalMapSampler->setFiltering(minFilter, magFilter, mipFilter); }
-
-    /// @deprecated use setNormalMapSampler
-    void setNormalMapAnisotropy(unsigned int anisotropy) { mNormalMapSampler->setAnisotropy(anisotropy); }
-
-    /// @deprecated use setNormalMapSampler
-    void setNormalMapMipBias(Real mipBias) { mNormalMapSampler->setMipmapBias(mipBias); }
 
     /// return the normal map sampler
     const SamplerPtr& getNormalMapSampler() const { return mNormalMapSampler; }

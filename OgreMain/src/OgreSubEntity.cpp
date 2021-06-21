@@ -65,10 +65,10 @@ namespace Ogre {
 
         if( !material )
         {
-            LogManager::getSingleton().logMessage("Can't assign material '" + name +
+            LogManager::getSingleton().logError("Can't assign material '" + name +
                 "' to SubEntity of '" + mParentEntity->getName() + "' because this "
                 "Material does not exist in group '"+groupName+"'. Have you forgotten to define it in a "
-                ".material script?", LML_CRITICAL);
+                ".material script?");
 
             material = MaterialManager::getSingleton().getDefaultMaterial();
         }
@@ -238,15 +238,16 @@ namespace Ogre {
         Real dist;
         if (!mSubMesh->extremityPoints.empty())
         {
+            bool euclidean = cam->getSortMode() == SM_DISTANCE;
+            Vector3 zAxis = cam->getDerivedDirection();
             const Vector3 &cp = cam->getDerivedPosition();
             const Affine3 &l2w = mParentEntity->_getParentNodeFullTransform();
             dist = std::numeric_limits<Real>::infinity();
-            for (std::vector<Vector3>::const_iterator i = mSubMesh->extremityPoints.begin();
-                 i != mSubMesh->extremityPoints.end (); ++i)
+            for (const Vector3& v : mSubMesh->extremityPoints)
             {
-                Vector3 v = l2w * (*i);
-                Real d = (v - cp).squaredLength();
-                
+                Vector3 diff = l2w * v - cp;
+                Real d = euclidean ? diff.squaredLength() : Math::Sqr(zAxis.dotProduct(diff));
+
                 dist = std::min(d, dist);
             }
         }

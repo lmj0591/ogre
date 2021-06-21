@@ -29,9 +29,6 @@ THE SOFTWARE.
 #define __D3D9PREREQUISITES_H__
 
 #include "OgrePrerequisites.h"
-#ifdef __MINGW32__
-#  include "OgreMinGWSupport.h" // extra defines for MinGW to deal with DX SDK
-#endif
 
 #include "Threading/OgreThreadHeaders.h"
 
@@ -71,7 +68,6 @@ THE SOFTWARE.
 #   define NOMINMAX // required to stop windows.h messing up std::min
 #endif
 #include <d3d9.h>
-#include <d3dx9.h>
 
 namespace Ogre
 {

@@ -31,7 +31,6 @@ THE SOFTWARE.
 #include "OgreETCCodec.h"
 #include "OgreImage.h"
 
-#define FOURCC(c0, c1, c2, c3) (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24))
 #define KTX_ENDIAN_REF      (0x04030201)
 #define KTX_ENDIAN_REF_REV  (0x01020304)
 
@@ -130,7 +129,7 @@ namespace Ogre {
     {
     }
     //---------------------------------------------------------------------
-    Codec::DecodeResult ETCCodec::decode(const DataStreamPtr& stream) const
+    ImageCodec::DecodeResult ETCCodec::decode(const DataStreamPtr& stream) const
     {
         DecodeResult ret;
         if (decodeKTX(stream, ret))
@@ -356,7 +355,7 @@ namespace Ogre {
         if (header.glType == 0 || header.glFormat == 0)
             imgData->flags |= IF_COMPRESSED;
 
-        size_t numFaces = header.numberOfFaces;
+        uint32 numFaces = header.numberOfFaces;
         if (numFaces > 1)
             imgData->flags |= IF_CUBEMAP;
         // Calculate total size from number of mipmaps, faces and size

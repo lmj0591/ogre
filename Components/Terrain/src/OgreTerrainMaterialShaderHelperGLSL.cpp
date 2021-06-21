@@ -66,7 +66,7 @@ namespace Ogre
 
         if (prof->getParent()->getDebugLevel())
         {
-            ret->setPreprocessorDefines(
+            ret->setParameter("preprocessor_defines",
                 StringUtil::format("TERRAIN_DEBUG,NUM_LODS=%d", terrain->getNumLodLevels()));
         }
 
@@ -98,7 +98,7 @@ namespace Ogre
         if (prof->getReceiveDynamicShadowsPSSM())
         {
             uint numShadowTextures = prof->getReceiveDynamicShadowsPSSM()->getSplitCount();
-            ret->setPreprocessorDefines(StringUtil::format("PSSM_NUM_SPLITS=%d", numShadowTextures));
+            ret->setParameter("preprocessor_defines", StringUtil::format("PSSM_NUM_SPLITS=%d", numShadowTextures));
         }
 
         if(!mIsGLSL)
@@ -390,7 +390,7 @@ namespace Ogre
 
         outStream <<
             "    vec3 lightDir = \n"
-            "        lightPosObjSpace.xyz - (oPosObj.xyz * lightPosObjSpace.w);\n"
+            "        -(lightPosObjSpace.xyz - (oPosObj.xyz * lightPosObjSpace.w));\n"
             "    vec3 eyeDir = eyePosObjSpace - oPosObj.xyz;\n"
 
             // set up accumulation areas

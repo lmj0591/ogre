@@ -42,10 +42,16 @@
     #endif
 #endif
 
-#ifdef OGRE_STATIC_LIB
+#ifdef OGRE_BITES_STATIC_PLUGINS
 // Static plugin headers
 #ifdef OGRE_STATIC_CgProgramManager
 #  include "OgreCgPlugin.h"
+#endif
+#ifdef OGRE_BUILD_PLUGIN_GLSLANG
+#  include "OgreGLSLangProgramManager.h"
+#endif
+#ifdef OGRE_BUILD_PLUGIN_ASSIMP
+#  include "OgreAssimpLoader.h"
 #endif
 #ifdef OGRE_STATIC_OctreeSceneManager
 #  include "OgreOctreePlugin.h"
@@ -71,6 +77,9 @@
 #ifdef OGRE_STATIC_Direct3D11
 #  include "OgreD3D11Plugin.h"
 #endif
+#ifdef OGRE_BUILD_RENDERSYSTEM_TINY
+#  include "OgreTinyPlugin.h"
+#endif
 #ifdef OGRE_STATIC_PCZSceneManager
 #  include "OgrePCZPlugin.h"
 #endif
@@ -91,7 +100,7 @@
 void OgreBites::StaticPluginLoader::load()
 {
     using namespace Ogre;
-#ifdef OGRE_STATIC_LIB
+#ifdef OGRE_BITES_STATIC_PLUGINS
     Plugin* plugin = NULL;
 #ifdef OGRE_STATIC_GL
     plugin = OGRE_NEW GLPlugin();
@@ -109,7 +118,10 @@ void OgreBites::StaticPluginLoader::load()
     plugin = OGRE_NEW D3D9Plugin();
     mPlugins.push_back(plugin);
 #endif
-
+#ifdef OGRE_BUILD_RENDERSYSTEM_TINY
+    plugin = OGRE_NEW TinyPlugin();
+    mPlugins.push_back(plugin);
+#endif
 #ifdef OGRE_STATIC_Direct3D11
     plugin = OGRE_NEW D3D11Plugin();
     mPlugins.push_back(plugin);
@@ -148,6 +160,14 @@ void OgreBites::StaticPluginLoader::load()
 #endif
 #if defined(OGRE_BUILD_PLUGIN_FREEIMAGE) && !defined(OGRE_BUILD_PLUGIN_STBI)
     plugin = OGRE_NEW FreeImagePlugin();
+    mPlugins.push_back(plugin);
+#endif
+#ifdef OGRE_BUILD_PLUGIN_ASSIMP
+    plugin = OGRE_NEW AssimpPlugin();
+    mPlugins.push_back(plugin);
+#endif
+#ifdef OGRE_BUILD_PLUGIN_GLSLANG
+    plugin = OGRE_NEW GLSLangPlugin();
     mPlugins.push_back(plugin);
 #endif
 #endif

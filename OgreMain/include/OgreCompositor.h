@@ -29,10 +29,10 @@ THE SOFTWARE.
 #define __Compositor_H__
 
 #include "OgrePrerequisites.h"
-#include "OgreIteratorWrapper.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
+    template <typename T> class VectorIterator;
 
     /** \addtogroup Core
     *  @{
@@ -67,11 +67,11 @@ namespace Ogre {
         
         /** Get a technique.
         */
-        CompositionTechnique *getTechnique(size_t idx);
+        CompositionTechnique *getTechnique(size_t idx) const { return mTechniques.at(idx); }
         
         /** Get the number of techniques.
         */
-        size_t getNumTechniques();
+        size_t getNumTechniques() const { return mTechniques.size(); }
         
         /** Remove all techniques
         */
@@ -86,7 +86,7 @@ namespace Ogre {
             which typically happens on loading it. Therefore, if this method returns
             an empty list, try calling Compositor::load.
         */
-        CompositionTechnique *getSupportedTechnique(size_t idx);
+        CompositionTechnique *getSupportedTechnique(size_t idx) const { return mSupportedTechniques.at(idx); }
         
         /** Get the number of supported techniques.
         @remarks
@@ -94,7 +94,7 @@ namespace Ogre {
             which typically happens on loading it. Therefore, if this method returns
             an empty list, try calling Compositor::load.
         */
-        size_t getNumSupportedTechniques();
+        size_t getNumSupportedTechniques() const { return mSupportedTechniques.size(); }
         
         /** Gets an iterator over all the Techniques which are supported by the current card. 
         @remarks
@@ -133,7 +133,7 @@ namespace Ogre {
             targets manually or any other modifications, the compositor instance 
             is in charge of this.
         */
-        RenderTarget* getRenderTarget(const String& name);
+        RenderTarget* getRenderTarget(const String& name, int slice = 0);
 
     protected:
         /// @copydoc Resource::loadImpl

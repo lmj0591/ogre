@@ -35,7 +35,7 @@ NativeWindowPair ApplicationContextSDL::createWindow(const Ogre::String& name, O
     NativeWindowPair ret = {NULL, NULL};
 
     if(!SDL_WasInit(SDL_INIT_VIDEO)) {
-        SDL_InitSubSystem(SDL_INIT_VIDEO);
+        SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
     }
 
     auto p = mRoot->getRenderSystem()->getRenderWindowDescription();
@@ -61,8 +61,11 @@ NativeWindowPair ApplicationContextSDL::createWindow(const Ogre::String& name, O
     SDL_GetWindowWMInfo(ret.native, &wmInfo);
 #endif
 
+    // for tiny rendersystem
+    p.miscParams["sdlwin"] = Ogre::StringConverter::toString(size_t(ret.native));
+
 #if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
-    p.miscParams["parentWindowHandle"] = Ogre::StringConverter::toString(size_t(wmInfo.info.x11.window));
+    p.miscParams["externalWindowHandle"] = Ogre::StringConverter::toString(size_t(wmInfo.info.x11.window));
 #elif OGRE_PLATFORM == OGRE_PLATFORM_WIN32
     p.miscParams["externalWindowHandle"] = Ogre::StringConverter::toString(size_t(wmInfo.info.win.window));
 #elif OGRE_PLATFORM == OGRE_PLATFORM_APPLE
@@ -136,8 +139,15 @@ void ApplicationContextSDL::pollEvents()
                     continue;
 
                 Ogre::RenderWindow* win = it->render;
-                win->windowMovedOrResized();
+                win->resize(event.window.data1, event.window.data2);
                 windowResized(win);
+            }
+            break;
+        case SDL_CONTROLLERDEVICEADDED:
+            if(auto c = SDL_GameControllerOpen(event.cdevice.which))
+            {
+                const char* name = SDL_GameControllerName(c);
+                Ogre::LogManager::getSingleton().stream() << "Opened Gamepad: " << (name ? name : "unnamed");
             }
             break;
         default:
